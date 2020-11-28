@@ -38,9 +38,9 @@ enum i2c_eeprom_write_state I2C_EEPROM_WriteNBytes(unsigned long Address,uint8_t
             return(I2C_EEPROM_WRITE_OPEN);
         case I2C_EEPROM_WRITE_OPEN:
             if(I2C_Open(make_control_byte(Address)));
-                return(I2C_EEPROM_WRITE_WRITE);
+                return(I2C_EEPROM_WRITE_ADDRESS_WRITE);
             return(state);
-        case I2C_EEPROM_WRITE_WRITE:
+        case I2C_EEPROM_WRITE_ADDRESS_WRITE:
             I2C_SetBuffer(data,len);
             I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
             I2C_MasterWrite();
@@ -56,5 +56,49 @@ enum i2c_eeprom_write_state I2C_EEPROM_WriteNBytes(unsigned long Address,uint8_t
 
 }
 
+enum i2c_eeprom_read_state I2C_EEPROM_ReadNBytes(unsigned long Address,uint8_t *data,size_t len,enum i2c_eeprom_read_state state)
+{
+    uint8_t address16[2];
+    
+    switch(state){
+        case I2C_EEPROM_READ_INIT:
+            address16[0] = (Address>>8)&0xff;
+            address16[1] = (Address       )&0xff;
+            return(I2C_EEPROM_READ_OPEN);
+        case I2C_EEPROM_READ_OPEN:
+            if(I2C_Open(make_control_byte(Address)));
+                return(I2C_EEPROM_READ_ADDRESS_WRITE);
+            return(state);
+        case I2C_EEPROM_READ_ADDRESS_WRITE:
+            I2C_SetBuffer(address16,2);
+            I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+            I2C_MasterWrite();
+            return(I2C_EEPROM_READ_CLOSE);
+        case I2C_EEPROM_READ_DATA_READ:
+            I2C_SetBuffer(data,len);
+            I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+            I2C_MasterWrite();
+            return(I2C_EEPROM_READ_CLOSE);
+        case I2C_EEPROM_READ_CLOSE:
+            if(I2C_BUSY == I2C_Close())
+                return(I2C_EEPROM_READ_CLOSE);
+            return(I2C_EEPROM_READ_FINISH);
+        default:
+            break;
+    };
+            return(I2C_EEPROM_READ_FINISH);
 
+}
 
+typedef struct
+{
+    size_t len;
+    uint8_t *data;
+}i2c_buffer_t;
+
+static i2c_operations_t eeprom_read_write_address_CompleteHandler(void *ptr)
+{
+    I2C_SetBuffer(((i2c_buffer_t *)ptr)->data,((i2c_buffer_t*)ptr)->len);
+    I2C_SetDataCompleteCallback(NULL,NULL);
+    return I2C_RESTART_READ;
+}
