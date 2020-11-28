@@ -47,7 +47,9 @@
 /*
                          Main application
  */
-void I2C_ReadNBytes(i2c_address_t address, uint8_t *data, size_t len);
+//void I2C_ReadNBytes(i2c_address_t address, uint8_t *data, size_t len);
+void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
+void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
 
 const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
@@ -73,10 +75,11 @@ void main(void)
     //INTERRUPT_PeripheralInterruptDisable();
 
 
-   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
+//   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
 
-   while(state!=I2C_EEPROM_WRITE_FINISH)
-        state = I2C_EEPROM_WriteNBytes(0,test_string ,16,state);
+//   while(state!=I2C_EEPROM_WRITE_FINISH)
+        I2C_EEPROM_WriteDataBlock(0,test_string ,16);
+        I2C_EEPROM_ReadDataBlock(0,buf ,16);
 
     while (1)
     {
