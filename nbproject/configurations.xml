@@ -19,6 +19,9 @@
         <itemPath>mcc_generated_files/pwm3.h</itemPath>
         <itemPath>mcc_generated_files/tmr6.h</itemPath>
       </logicalFolder>
+      <itemPath>system.h</itemPath>
+      <itemPath>uart_print.h</itemPath>
+      <itemPath>stts751.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -43,6 +46,7 @@
         <itemPath>mcc_generated_files/tmr6.c</itemPath>
       </logicalFolder>
       <itemPath>main.c</itemPath>
+      <itemPath>logger.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
