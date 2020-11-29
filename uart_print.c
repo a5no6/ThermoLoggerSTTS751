@@ -6,11 +6,13 @@
  * Last Modified 2019/05/04
  */
 
+#define USE_WITH_MCC_UART
 #include <xc.h>
 #include <stdbool.h>
 #include <stdint.h>
 #ifdef USE_WITH_MCC_UART
 #include <stdio.h>
+#include "mcc_generated_files/eusart.h"
 #else
 #include "system.h"
 #endif
@@ -97,10 +99,11 @@ void UART_putc(const char c)
         }
      * 
      */
-    while(UART1_IsTxReady() == false);
-    asm("di");
-    UART1_Write(c);
-    asm("ei");
+//    while(UART1_IsTxReady() == false);
+//    asm("di");
+//    UART1_Write(c);
+//    asm("ei");
+    EUSART_Write(c);
 }
 
 void UART_puts(const char *buf)

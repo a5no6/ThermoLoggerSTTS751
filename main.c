@@ -42,7 +42,8 @@
 */
 
 #include "mcc_generated_files/mcc.h"
-#include "non_mcc/i2c_eeprom.h"
+//#include "non_mcc/i2c_eeprom.h"
+#include "uart_print.h"
 
 /*
                          Main application
@@ -76,13 +77,21 @@ void main(void)
 
 
 //   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
-
+LATCbits.LATC3 = 1;
+    UART_puts("Hello.\n");
 //   while(state!=I2C_EEPROM_WRITE_FINISH)
-        I2C_EEPROM_WriteDataBlock(0,test_string ,16);
-        I2C_EEPROM_ReadDataBlock(0,buf ,16);
+    UART_puts("s1\n");
+        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
+    UART_puts("s2\n");
+//        I2C_EEPROM_ReadDataBlock(0,buf ,32);
+    UART_puts("s3\n");
+        
+    UART_puts(buf);
+            
 
     while (1)
     {
+//    UART_puts("Hello.\n");
         // Add your application code
     }
 }
