@@ -9,6 +9,7 @@
 #include <xc.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "system.h"
 //#include "xc8_i2c.h"
 //#include "xc8_i2c_eeprom.h"
@@ -117,6 +118,9 @@ void set_pwm_state_monitor_clock(cpu_clock_t clk)
             break;
     }
 }
+
+
+#if 0
 
 void switch_clock_to(cpu_clock_t clk)
 {
@@ -585,3 +589,6 @@ void main(void)
     LOG_INFO(UART_puts("end of main\n");UART_flush(););
     while(1);
  }
+
+#endif
+

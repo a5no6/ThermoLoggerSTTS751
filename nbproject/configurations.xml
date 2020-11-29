@@ -50,6 +50,7 @@
       </logicalFolder>
       <itemPath>main.c</itemPath>
       <itemPath>logger.c</itemPath>
+      <itemPath>uart_print.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

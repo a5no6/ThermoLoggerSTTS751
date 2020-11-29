@@ -56,7 +56,7 @@ extern "C" {
 #endif
 
     
-typedef  unsigned char bool;
+//typedef  unsigned char bool;
 
 #define false (0)
 #define true (1)
