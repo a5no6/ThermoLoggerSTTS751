@@ -9,9 +9,14 @@
 #include <xc.h>
 #include <stdbool.h>
 #include <stdint.h>
+#ifdef USE_WITH_MCC_UART
+#include <stdio.h>
+#else
 #include "system.h"
+#endif
 #include "uart_print.h"
 
+#ifndef USE_WITH_MCC_UART
 volatile char g_uart_tx_bk_buf[UART_TX_BK_BUF_LEN];
 volatile unsigned short g_uart_tx_bk_len = 0;
 volatile unsigned short g_uart_tx_bk_ind = 0;
@@ -29,6 +34,7 @@ void UART_TX_BK_TASK(void)
 void UART_TX_Interrupt_Handler(void)
 {
     int i;
+    if(TXIE==0||TXIF==0) return;
     for(i=0;i<(UART_FIFO_DEPTH+1) &&  g_uart_tx_bk_len>0;i++){ // FIFO + Shift register
         TXREG = g_uart_tx_bk_buf[g_uart_tx_bk_ind];
         g_uart_tx_bk_ind = (g_uart_tx_bk_ind+1)%UART_TX_BK_BUF_LEN;
@@ -39,19 +45,11 @@ void UART_TX_Interrupt_Handler(void)
 }
 #endif
 
-unsigned char is_UART_busy(void)
-{
-    if(g_uart_tx_bk_len==0 && !TX_BUF_FULL &&  TRMT)
-        return(0);
-    else
-        return(1);
-}
-
 /*  
  32MM needs no port setting
  * PIC16,32MX needs port setting,(ANSEL,TRIS,PPS)
  */
-void UART_init(unsigned long clk,unsigned short bps)
+void UART_init(unsigned long clk,unsigned long bps)
 {
 #ifdef    __XC8
     unsigned long dwBaud;
@@ -70,15 +68,6 @@ void UART_init(unsigned long clk,unsigned short bps)
     U1MODEbits.ON = 1;
 #endif
 }
-void UART_flush(void)
-{
-    while(is_UART_busy()){
-#ifndef UART_TX_INTERRUPT
-        UART_TX_BK_TASK();
-#endif
-        CLEAR_WDT;
-    }
-}
 
 void UART_puts(const char *buf)
 {
@@ -94,6 +83,64 @@ void UART_puts(const char *buf)
         TXIE=1;
 #endif
 }
+#else
+
+void UART_putc(const char c)
+{
+    /*
+     * Change like below, other wise freeze when buffer gets full.
+    void UART1_Write( uint8_t byte)
+    {
+        while(UART1_IsTxReady() == 0)
+        {
+            return;
+        }
+     * 
+     */
+    while(UART1_IsTxReady() == false);
+    asm("di");
+    UART1_Write(c);
+    asm("ei");
+}
+
+void UART_puts(const char *buf)
+{
+    int i=0;
+    while(buf[i]!=0){
+//    _mon_putc(buf[i++]);
+        UART_putc(buf[i++]);
+    }
+}
+
+#endif
+
+unsigned char is_UART_busy(void)
+{
+#ifdef USE_WITH_MCC_UART
+    if(UART1_IsTxDone())
+        return(0);
+    else
+        return(1);
+#else
+    if(g_uart_tx_bk_len==0 && !TX_BUF_FULL &&  TRMT)
+        return(0);
+    else
+        return(1);
+#endif
+}
+
+void UART_flush(void)
+{
+    while(is_UART_busy()){
+#ifdef USE_WITH_MCC_UART
+#else
+#ifndef UART_TX_INTERRUPT
+        UART_TX_BK_TASK();
+#endif
+        CLEAR_WDT;
+#endif
+    }
+}
 
 int UART_put_uint8(unsigned char d)
 {
@@ -102,8 +149,10 @@ int UART_put_uint8(unsigned char d)
 #ifdef UART_TX_INTERRUPT
         TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+(2+1) >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     for(i=0;i<2;i++){
         int c = 0;
         while(d>=unit[i]){
@@ -111,14 +160,21 @@ int UART_put_uint8(unsigned char d)
             d -= unit[i];
         }
         if(disp_digit!=0 || c!=0 ) {
-//        }else{
+#ifdef USE_WITH_MCC_UART
+            printf("%c", c + '0' );
+#else
             g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = c + '0';
             g_uart_tx_bk_len++;
+#endif
             disp_digit++;
         }
     }
+#ifdef USE_WITH_MCC_UART
+            printf("%c", (unsigned char)d + '0' );
+#else
     g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = (unsigned char)d + '0';
     g_uart_tx_bk_len++;
+#endif
     disp_digit++;
 #ifdef UART_TX_INTERRUPT
     TXIE=1;
@@ -131,11 +187,17 @@ int UART_put_int8(signed char d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+4 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     if(d<0){
+#ifdef USE_WITH_MCC_UART
+            printf("-" );
+#else
         g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] =  '-';
         g_uart_tx_bk_len++;
+#endif
         d = -d;
         return(UART_put_uint8(d)+1);
     }else{
@@ -148,19 +210,29 @@ int UART_put_HEX8(unsigned char d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+2 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     unsigned char c;
     c = (d>>4) ;
     c = (c<10) ? (c+'0'):(c+'A'-10);
+#ifdef USE_WITH_MCC_UART
+            printf("%c",c);
+#else
     g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] = c;
     g_uart_tx_bk_len++;
+#endif
     c = (d&0xf);
     c = (c<10) ? (c+'0'):(c+'A'-10);
+#ifdef USE_WITH_MCC_UART
+            printf("%c",c);
+#else
     g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] = c;
     g_uart_tx_bk_len++;
 #ifdef UART_TX_INTERRUPT
     TXIE=1;
+#endif
 #endif
     return(2);
 }
@@ -171,8 +243,10 @@ int UART_put_HEX16(unsigned short d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+2*2 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     unsigned char *p = (unsigned char *)&d;
     for(i=0;i<2;i++){
         UART_put_HEX8(p[(2-1)-i]); // Little Endian 
@@ -187,8 +261,10 @@ int UART_put_uint16(unsigned short d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+(4+1) >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     for(i=0;i<4;i++){
         int c = 0;
         while(d>=unit[i]){
@@ -196,13 +272,21 @@ int UART_put_uint16(unsigned short d)
             d -= unit[i];
         }
         if(disp_digit!=0 || c!=0 ) {
+#ifdef USE_WITH_MCC_UART
+            printf("%c",c+'0');
+#else
             g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = c + '0';
             g_uart_tx_bk_len++;
+#endif
             disp_digit++;
         }
     }
+#ifdef USE_WITH_MCC_UART
+            putchar((unsigned char)d + '0');
+#else
     g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = (unsigned char)d + '0';
     g_uart_tx_bk_len++;
+#endif
     disp_digit++;
 #ifdef UART_TX_INTERRUPT
     TXIE=1;
@@ -215,11 +299,17 @@ int UART_put_int16(short d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+6 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     if(d<0){
+#ifdef USE_WITH_MCC_UART
+        printf("-");
+#else
         g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] =  '-';
         g_uart_tx_bk_len++;
+#endif
         d = -d;
         return(UART_put_uint16(d)+1);
     }else{
@@ -235,8 +325,10 @@ int UART_put_HEX32(unsigned long d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+2*4 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     unsigned char *p = (unsigned char *)&d;
     for(i=0;i<4;i++){
         UART_put_HEX8(p[(4-1)-i]); // Little Endian 
@@ -251,8 +343,10 @@ int UART_put_uint32(unsigned long d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+9 >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     for(i=0;i<9;i++){
         int c = 0;
         while(d>=unit[i]){
@@ -260,13 +354,21 @@ int UART_put_uint32(unsigned long d)
             d -= unit[i];
         }
         if(disp_digit!=0 || c!=0 ) {
+#ifdef USE_WITH_MCC_UART
+            printf("%c",c + '0');
+#else
             g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = c + '0';
             g_uart_tx_bk_len++;
+#endif
             disp_digit++;
         }
     }
+#ifdef USE_WITH_MCC_UART
+            printf("%c",(unsigned char)d + '0');
+#else
     g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = (unsigned char)d + '0';
     g_uart_tx_bk_len++;
+#endif
     disp_digit++;
 #ifdef UART_TX_INTERRUPT
     TXIE=1;
@@ -279,11 +381,17 @@ int UART_put_int32(long d)
 #ifdef UART_TX_INTERRUPT
     TXIE=0;
 #endif
+#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+(9+1) >= UART_TX_BK_BUF_LEN)
         return (0);
+#endif
     if(d<0){
+#ifdef USE_WITH_MCC_UART
+        printf("-");
+#else
         g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] =  '-';
         g_uart_tx_bk_len++;
+#endif
         d = -d;
         return(UART_put_uint32(d)+1);
     }else{
