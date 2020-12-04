@@ -215,7 +215,7 @@ void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t l
 
     while(!I2C_Open(make_control_byte(mem_address<<1|1))); // sit here until we get the bus..
     I2C_SetDataCompleteCallback(rdBlkRegCompleteHandler,&bufferBlock);
-    I2C_SetBuffer(&address16,2);
+    I2C_SetBuffer(address16,2);
     I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
     I2C_MasterWrite();
     while(I2C_BUSY == I2C_Close()); // sit here until finished.
@@ -232,7 +232,7 @@ void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t 
 
     while(!I2C_Open(make_control_byte(mem_address<<1))); // sit here until we get the bus..
     I2C_SetDataCompleteCallback(wrBlkRegCompleteHandler,&bufferBlock);
-    I2C_SetBuffer(&address16,2);
+    I2C_SetBuffer(address16,2);
     I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
     I2C_MasterWrite();
     while(I2C_BUSY == I2C_Close()); // sit here until finished.
