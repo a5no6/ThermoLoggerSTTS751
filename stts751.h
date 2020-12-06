@@ -12,6 +12,8 @@
 extern "C" {
 #endif
 
+#define STTS751_I2C_ADDRESS (0x72/2)
+    
 #define STTS751_REGISTER_ADDRESS_STATUS    (0x01)
 #define STTS751_REGISTER_ADDRESS_HI    (0x00)
 #define STTS751_REGISTER_ADDRESS_LO    (0x02)

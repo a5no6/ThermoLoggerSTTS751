@@ -9,6 +9,7 @@
 #include <xc.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include "system.h"
 //#include "xc8_i2c.h"
@@ -72,6 +73,16 @@ typedef struct {
     unsigned short in_state_wake_count;
 } info_t;
 
+#define EEPROM_SEQ_LIMIT    (200*10)
+
+#define EEPROM_BLOCK_SIZE   (64)
+typedef struct {
+    unsigned long eeprom_address;
+    unsigned long eeprom_address_unwritten;
+    unsigned char eeprom_chache[EEPROM_BLOCK_SIZE];
+    unsigned eeprom_available :1; 
+} _eeprom_cache_data;
+
 void input_filter(_io_input_filter *f,unsigned char input);
 void supply_power_on_demand(int on);
 void STTS751_read_regsiter(unsigned char regsiter,unsigned short *d);
@@ -79,6 +90,7 @@ void update_power_on_demand(info_t* s);
 
 _io_input_filter g_external_request_input;
 volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
+_eeprom_cache_data g_eeprom_cache;
 
 //unsigned short stts_log_interval = DEFAULT_LOG_INTERVAL_MINUTES*(60/2); /* (60s/2s)*10min */
 unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
@@ -120,7 +132,6 @@ void set_pwm_state_monitor_clock(cpu_clock_t clk)
 }
 
 
-#if 0
 
 void switch_clock_to(cpu_clock_t clk)
 {
@@ -149,17 +160,18 @@ void switch_clock_to(cpu_clock_t clk)
     PWM3CONbits.PWM3EN = 1;
 #endif
 }
+void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
 
 
 bool read_log_interval(void)
 {
+    unsigned short eerom_validation;
     unsigned char d;
     for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<0xffff;eerom_validation++) 
-        Read_EEPROM_DATA_Sequential(TIME_INTERVAL_ADDRESS,&d,1);
+        I2C_EEPROM_ReadDataBlock(TIME_INTERVAL_ADDRESS,&d,1);
     LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
     if(eerom_validation>0x1000)
         return(false);        
-//    i2c_state = 1; while(i2c_state>0) Read_EEPROM_DATA_Sequential(TIME_INTERVAL_ADDRESS,&d,1);
     LOG_DEBUG(UART_puts("d=");UART_put_uint8(d);UART_puts("\n");UART_flush(););
     if(d>0){
         stts_log_interval =(WDT_COUNT_10MINUTES*(unsigned short)d)/DEFAULT_LOG_INTERVAL_MINUTES;
@@ -169,6 +181,7 @@ bool read_log_interval(void)
     }
     return(true);
 }
+
 
 void state_machine(info_t* s)
 {
@@ -273,6 +286,9 @@ void state_machine(info_t* s)
                     s->mainstate = read_st751_hi;
             }
             break;
+    }
+}
+#if 0
         case read_st751_hi:
             if(i2c_state){
                 STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_HI,&d);
@@ -592,3 +608,9 @@ void main(void)
 
 #endif
 
+void logger_main(void)
+{
+    while(1){
+        state_machine(&g_info);
+    }
+}

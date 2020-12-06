@@ -46,7 +46,6 @@
 
 #include "i2c_master_example.h"
 
-
 typedef struct
 {
     size_t len;

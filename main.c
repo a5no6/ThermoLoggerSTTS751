@@ -54,6 +54,7 @@ void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t 
 
 const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
+void logger_main(void);
 
 void main(void)
 {
@@ -89,6 +90,7 @@ __delay_ms(100);
         
     UART_puts(buf);
             
+    logger_main();
 
     while (1)
     {
