@@ -439,6 +439,8 @@ void init_i2c(void)
     SSPADD = ((_XTAL_FREQ/I2C_FREQ)-4)/4;                // set Baud rate clock divider
 }
 
+#endif
+
 void supply_power_on_demand(int on)
 {
     if(on!=0){
@@ -528,6 +530,8 @@ void state_monitor(info_t* s)
             break;
     }
 }
+
+#if 0
 
 void main(void) 
 {   

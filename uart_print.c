@@ -87,6 +87,35 @@ void UART_puts(const char *buf)
 }
 #else
 
+void UART_init(unsigned long clk,unsigned long bps)
+{
+#ifdef    __XC8
+    unsigned long dwBaud;
+    unsigned char txie = TXIE;
+    TXIE = 0;
+    while(!EUSART_is_tx_done());
+    SYNC = 0;
+    BRGH = 1;
+    BRG16 = 1;
+    dwBaud = ((clk/4) / bps) - 1;
+    SPBRG = (unsigned char) dwBaud;
+    SPBRGH = (unsigned char)((unsigned short) (dwBaud >> 8));
+    TXEN = 1;
+    SPEN = 1;
+    TXIE = txie;
+#else
+    U1BRG = (((clk/16) / bps) - 1);
+    U1STAbits.UTXISEL = 0b01;//01 = Interrupt is generated and asserted when all characters have been transmitted
+    U1STAbits.UTXEN = 1;
+    U1MODEbits.ON = 1;
+#endif
+}
+
+void UART_TX_BK_TASK(void)
+{
+              EUSART_TxDefaultInterruptHandler();
+}
+
 void UART_putc(const char c)
 {
     /*
@@ -120,7 +149,7 @@ void UART_puts(const char *buf)
 unsigned char is_UART_busy(void)
 {
 #ifdef USE_WITH_MCC_UART
-    if(UART1_IsTxDone())
+    if(EUSART_is_tx_done())
         return(0);
     else
         return(1);

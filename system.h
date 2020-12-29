@@ -62,7 +62,7 @@ extern "C" {
 #define true (1)
 
 
-#define ENABLE_MODULE_TEST
+//#define ENABLE_MODULE_TEST
 
 #ifdef	__cplusplus
 }
