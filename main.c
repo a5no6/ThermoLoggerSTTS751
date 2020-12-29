@@ -44,6 +44,7 @@
 #include "mcc_generated_files/mcc.h"
 //#include "non_mcc/i2c_eeprom.h"
 #include "uart_print.h"
+#include "stts751.h"
 
 /*
                          Main application
@@ -60,7 +61,6 @@ void main(void)
 {
     // initialize the device
     SYSTEM_Initialize();
-    TXIE = 0;
 
     // When using interrupts, you need to set the Global and Peripheral Interrupt Enable bits
     // Use the following macros to:
@@ -90,13 +90,24 @@ __delay_ms(100);
     UART_puts("s3\n");
         
     UART_puts(buf);
+    UART_flush();
             
-    logger_main();
-
+//    logger_main();
+    unsigned short d;
+    unsigned short reg;
+    
     while (1)
     {
 //    UART_puts("Hello.\n");
         // Add your application code
+        for(reg = 0;reg<1;reg++){
+            STTS751_read_regsiter(reg,&d);
+//            UART_put_HEX8(reg);
+//            UART_puts(" ");
+            UART_put_int8(d);
+            UART_puts("\n");
+            UART_flush();
+        }
     }
 }
 /**

@@ -4,10 +4,12 @@
 #include "system.h"
 #include "stts751.h"
 #include "uart_print.h"
+#include "mcc_generated_files/examples/i2c_master_example.h"
 
 
-void STTS751_read_regsiter(unsigned char regsiter,unsigned short *d)
+void STTS751_read_regsiter(unsigned char reg,unsigned short *d)
 {
+    *d = I2C_Read1ByteRegister(STTS751_I2C_ADDRESS,reg);
 }
 
 #ifdef ENABLE_MODULE_TEST
