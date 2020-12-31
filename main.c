@@ -46,12 +46,18 @@
 #include "uart_print.h"
 #include "stts751.h"
 
+
+#define EEPROM_HEADER_BLOCK_SIZE    (16)
+#define TIME_INTERVAL_ADDRESS   (14)
+
 /*
                          Main application
  */
 //void I2C_ReadNBytes(i2c_address_t address, uint8_t *data, size_t len);
 void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
 void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
+bool load_eeprom_data(unsigned short search_start);
+
 
 const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
@@ -96,18 +102,21 @@ __delay_ms(100);
     unsigned short d;
     unsigned short reg;
     
+    load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE);
+    
     while (1)
     {
 //    UART_puts("Hello.\n");
         // Add your application code
-        for(reg = 0;reg<1;reg++){
+        for(reg = 0;reg<3;reg++){
             STTS751_read_regsiter(reg,&d);
-//            UART_put_HEX8(reg);
-//            UART_puts(" ");
-            UART_put_int8(d);
-            UART_puts("\n");
+            UART_put_HEX8(reg);
+            UART_puts(" ");
+            UART_put_HEX8(d);
+            UART_puts(" ");
             UART_flush();
         }
+            UART_puts("\n");
     }
 }
 /**

@@ -18,6 +18,8 @@
 #endif
 #include "uart_print.h"
 
+#define USE_DEBUG_LONG_TYPE
+
 #ifndef USE_WITH_MCC_UART
 volatile char g_uart_tx_bk_buf[UART_TX_BK_BUF_LEN];
 volatile unsigned short g_uart_tx_bk_len = 0;

@@ -87,6 +87,7 @@ void input_filter(_io_input_filter *f,unsigned char input);
 void supply_power_on_demand(int on);
 void STTS751_read_regsiter(unsigned char regsiter,unsigned short *d);
 void update_power_on_demand(info_t* s);
+bool load_eeprom_data(unsigned short search_start);
 
 _io_input_filter g_external_request_input;
 volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
@@ -611,6 +612,91 @@ void main(void)
  }
 
 #endif
+
+
+
+void find_empty_addres(unsigned long *address,unsigned short search_start)
+{
+    long low = 0, high = EEPROM_SIZE_BYTE, step = EEPROM_SIZE_BYTE / 2;
+
+    while (1) {
+		*address = low + step;
+		unsigned char d = 0x55;
+#if UART_DEBUG_LEVEL>2
+        UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");
+        
+#endif
+//       i2c_state=1;for(eerom_validation=0;eerom_validation<195*10 && i2c_state;eerom_validation++){
+//			Read_EEPROM_DATA_Sequential(*address<search_start? search_start: *address, &d, 1);
+//        }
+            I2C_EEPROM_ReadDataBlock(*address<search_start? search_start: *address, &d, 1);
+            UART_puts("d=");UART_put_HEX8(d);UART_puts("\n");
+//        if(eerom_validation>=EEPROM_SEQ_LIMIT) return;
+        
+		if (d)
+			low = *address;
+		else 
+			high = *address;
+		step = step >> 1;
+		if (step < EEPROM_BLOCK_SIZE)
+			break;
+	}
+
+	*address = low;
+    unsigned char i;
+    for(i=0;i<2;i++){
+         if((*address+EEPROM_BLOCK_SIZE)>=EEPROM_SIZE_BYTE) break;
+//        i2c_state=1;for(eerom_validation=0;eerom_validation<EEPROM_SEQ_LIMIT && i2c_state;eerom_validation++){
+//            Read_EEPROM_DATA_Sequential(*address,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+//        }
+//        if(eerom_validation>=EEPROM_SEQ_LIMIT) return;
+            I2C_EEPROM_ReadDataBlock(*address,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+        
+        for(step=0;step<EEPROM_BLOCK_SIZE;step+=1,*address+=1){
+            if(*address>=EEPROM_SIZE_BYTE) break;
+            if(search_start>0 && *address < search_start)
+                continue;
+            if(g_eeprom_cache.eeprom_chache[step]==0){
+                LOG_DEBUG(UART_puts("find_empty first empty address=");UART_put_HEX32(*address);UART_puts("\n"););
+                return;
+            }
+        }
+    }    
+#if UART_DEBUG_LEVEL>2
+    UART_puts("find_empty could not find empty address\n");
+#endif
+    *address = EEPROM_SIZE_BYTE;        
+}
+
+bool load_eeprom_data(unsigned short search_start)
+{
+    long a;
+    find_empty_addres(&g_eeprom_cache.eeprom_address,search_start);
+    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
+//    if(eerom_validation>=EEPROM_SEQ_LIMIT){
+#if UART_DEBUG_LEVEL>0
+//             UART_puts("eeprom not responded\n");
+#endif
+//        return(false);
+//    }
+    a = g_eeprom_cache.eeprom_address;
+    if(a>=1){
+        g_eeprom_cache.eeprom_address_unwritten = a;
+        a -= 1;
+//        for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<EEPROM_SEQ_LIMIT;eerom_validation++) 
+//            Read_EEPROM_DATA_Sequential(a&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+        I2C_EEPROM_ReadDataBlock(a&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+        LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
+//        if(eerom_validation>=EEPROM_SEQ_LIMIT) return(false);
+    }
+//    for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<EEPROM_SEQ_LIMIT;eerom_validation++) 
+//        Read_EEPROM_DATA_Sequential(g_eeprom_cache.eeprom_address&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+        I2C_EEPROM_ReadDataBlock(g_eeprom_cache.eeprom_address&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
+//    if(eerom_validation>=EEPROM_SEQ_LIMIT) return(false);
+    return(true);
+}
+
 
 void logger_main(void)
 {
