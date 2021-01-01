@@ -621,7 +621,7 @@ void find_empty_addres(unsigned long *address,unsigned short search_start)
 
     while (1) {
 		*address = low + step;
-		unsigned char d = 0x55;
+		unsigned char d = 0x0;
 #if UART_DEBUG_LEVEL>2
         UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");
         

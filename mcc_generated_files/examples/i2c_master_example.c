@@ -45,6 +45,7 @@
 */
 
 #include "i2c_master_example.h"
+#include "../../uart_print.h"
 
 typedef struct
 {
@@ -180,6 +181,14 @@ static i2c_operations_t wrBlkRegCompleteHandler(void *ptr)
     return I2C_CONTINUE;
 }
 
+bool is_address_nack;
+
+static i2c_operations_t address_nack_handler(void *ptr)
+{
+    is_address_nack = false;
+     return I2C_STOP;        
+}
+
 
 #define EEPROM_DEVICE_CODE  0b1010 // All I2C devices have a control code assigned to them.
 unsigned char address_shift_for_chip_select = 16; /* usually 16. set byte address bits for multiple eeprom device use. */
@@ -211,13 +220,16 @@ void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t l
     i2c_buffer_t bufferBlock; // result is little endian
     bufferBlock.data = data;
     bufferBlock.len = len;
+    is_address_nack = true;
 
     while(!I2C_Open(make_control_byte(mem_address))); // sit here until we get the bus..
     I2C_SetDataCompleteCallback(rdBlkRegCompleteHandler,&bufferBlock);
     I2C_SetBuffer(address16,2);
-    I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+//    I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+    I2C_SetAddressNackCallback(address_nack_handler,NULL); //NACK polling?
     I2C_MasterWrite();
     while(I2C_BUSY == I2C_Close()); // sit here until finished.
+    UART_put_HEX8(is_address_nack);UART_puts("\n");
 }
 
 void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t len)
@@ -228,6 +240,7 @@ void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t 
     i2c_buffer_t bufferBlock; // result is little endian
     bufferBlock.data = data;
     bufferBlock.len = len;
+    is_address_nack = true;
 
     while(!I2C_Open(make_control_byte(mem_address))); // sit here until we get the bus..
     I2C_SetDataCompleteCallback(wrBlkRegCompleteHandler,&bufferBlock);
