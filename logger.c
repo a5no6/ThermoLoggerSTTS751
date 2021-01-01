@@ -100,6 +100,11 @@ unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
 
 system_error_t system_error;
 
+static i2c_operations_t i2c_nack_handler(void *ptr)
+{
+    i2c_is_nack = false;
+     return I2C_STOP;        
+}
 
 void disable_i2c(void){
     SSPCONbits.SSPEN=0;  
@@ -191,7 +196,6 @@ bool read_log_interval(void)
 
 void state_machine(info_t* s)
 {
-    unsigned short d;
     short temperature;
     long s2;
     unsigned char returnValue;
@@ -289,12 +293,11 @@ void state_machine(info_t* s)
            returnValue = 0x00;
            reg = STTS751_REGISTER_ADDRESS_STATUS;
 
-            while(!I2C_Open(STTS751_I2C_ADDRESS)); // sit here until we get the bus..
+            I2C_Open(STTS751_I2C_ADDRESS);
             I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
             I2C_SetBuffer(&reg,1);
-            I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+            I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
             I2C_MasterWrite();
-//            while(I2C_BUSY == I2C_Close()); // sit here until finished.
             s->mainstate = read_st751_hi_wait;
             break;
         case read_st751_status_wait:
@@ -306,9 +309,10 @@ void state_machine(info_t* s)
                 LOG_DEBUG(UART_puts(".\n");UART_flush(););
                 if(i2c_is_nack){
                     s->mainstate = read_st751_hi_init;
+                    i2c_nack_retry = 3;
                 }else{
                     if(--i2c_nack_retry>0){
-                        s->mainstate = read_st751_hi_init;
+                        s->mainstate = read_st751_status_init;
                     }else{
                         s->mainstate = abnormal;
                     }
@@ -316,13 +320,30 @@ void state_machine(info_t* s)
            }
             break;
         case read_st751_hi_init:
-                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_HI,&d);
+            reg = STTS751_REGISTER_ADDRESS_HI;
+             I2C_Open(STTS751_I2C_ADDRESS);
+             I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
+             I2C_SetBuffer(&reg,1);
+             I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
+             I2C_MasterWrite();
+             s->mainstate = read_st751_hi_wait;
+            break;
+        case read_st751_hi_wait:
                 LOG_DEBUG(UART_puts("hi d=");UART_flush(););
-                LOG_DEBUG(UART_put_uint16(d);UART_flush(););
+                LOG_DEBUG(UART_put_uint16(returnValue);UART_flush(););
                 LOG_DEBUG(UART_puts(".\n");UART_flush(););
-                temperature = (d&0xff)<<8;
-                s->mainstate = read_st751_lo_init;
-                LOG_DEBUG(s2 = (short )((d&0xff) * 256 ););
+                if(i2c_is_nack){
+                    temperature = (returnValue&0xff)<<8;
+                    s->mainstate = read_st751_lo_init;
+                    s->mainstate = read_st751_status_init;
+                    i2c_nack_retry = 3;
+                }else{
+                    if(--i2c_nack_retry>0){
+                        s->mainstate = read_st751_hi_init;
+                    }else{
+                        s->mainstate = abnormal;
+                    }
+                }
             break;
     }
 }
@@ -684,19 +705,13 @@ bool load_eeprom_data(unsigned short search_start)
 {
     long a;
     find_empty_addres(&g_eeprom_cache.eeprom_address,search_start);
-    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
-#if UART_DEBUG_LEVEL>0
-             UART_puts("eeprom not responded\n");
-#endif
     a = g_eeprom_cache.eeprom_address;
     if(a>=1){
         g_eeprom_cache.eeprom_address_unwritten = a;
         a -= 1;
         I2C_EEPROM_ReadDataBlock(a&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
-        LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
     }
         I2C_EEPROM_ReadDataBlock(g_eeprom_cache.eeprom_address&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
-    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
     return(true);
 }
 

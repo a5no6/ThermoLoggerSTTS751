@@ -12,8 +12,8 @@
 extern "C" {
 #endif
 
-//#define LOG_DEBUG(x)    {x}
-#define LOG_DEBUG(x)    
+#define LOG_DEBUG(x)    {x}
+//#define LOG_DEBUG(x)    
 
 #define LOG_INFO(x)    {x}
 //#define ASSERT(cond,not_satisfy)    if(!(cond)){not_satisfy}

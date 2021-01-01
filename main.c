@@ -89,7 +89,7 @@ void main(void)
 //   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
 //LATCbits.LATC3 = 1;
 //__delay_ms(100);
-//    UART_puts("Hello.\n");
+    UART_puts("Hello.\n");
 //   while(state!=I2C_EEPROM_WRITE_FINISH)
 //    UART_puts("s1\n");
 //        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
@@ -98,7 +98,7 @@ void main(void)
 //    UART_puts("s3\n");
         
 //    UART_puts(buf);
- //   UART_flush();
+   UART_flush();
             
    logger_main();
 #if 0
