@@ -63,6 +63,8 @@ const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
 void logger_main(void);
 
+#define EEPROM_SIZE_BYTE	(0x20000)
+
 void main(void)
 {
     // initialize the device
@@ -89,13 +91,13 @@ LATCbits.LATC3 = 1;
 __delay_ms(100);
     UART_puts("Hello.\n");
 //   while(state!=I2C_EEPROM_WRITE_FINISH)
-    UART_puts("s1\n");
-        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
-    UART_puts("s2\n");
-       I2C_EEPROM_ReadDataBlock(0,buf ,32);
-    UART_puts("s3\n");
+//    UART_puts("s1\n");
+//        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
+//    UART_puts("s2\n");
+//       I2C_EEPROM_ReadDataBlock(0,buf ,32);
+//    UART_puts("s3\n");
         
-    UART_puts(buf);
+//    UART_puts(buf);
     UART_flush();
             
 //    logger_main();
@@ -117,7 +119,9 @@ __delay_ms(100);
             UART_flush();
         }
             UART_puts("\n");
+//            break;
     }
+    while(1);
 }
 /**
  End of File

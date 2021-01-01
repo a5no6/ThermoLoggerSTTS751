@@ -630,7 +630,6 @@ void find_empty_addres(unsigned long *address,unsigned short search_start)
 //			Read_EEPROM_DATA_Sequential(*address<search_start? search_start: *address, &d, 1);
 //        }
             I2C_EEPROM_ReadDataBlock(*address<search_start? search_start: *address, &d, 1);
-            UART_puts("d=");UART_put_HEX8(d);UART_puts("\n");
 //        if(eerom_validation>=EEPROM_SEQ_LIMIT) return;
         
 		if (d)
