@@ -12,13 +12,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "system.h"
-//#include "xc8_i2c.h"
-//#include "xc8_i2c_eeprom.h"
 #include "uart_print.h"
 #include "stts751.h"
-
-int i2c_state;
-
+#include"mcc_generated_files/examples/i2c_master_example.h"
 
 #define EEPROM_HEADER_BLOCK_SIZE    (16)
 #define TIME_INTERVAL_ADDRESS   (14)
@@ -45,9 +41,12 @@ typedef enum {
     sleep,
     wait_for_external_use_to_be_removed,
     wait_10ms,
-    read_st751_status,
-    read_st751_lo,
-    read_st751_hi,
+    read_st751_status_init,
+    read_st751_status_wait,
+    read_st751_lo_init,
+    read_st751_lo_wait,
+    read_st751_hi_init,
+    read_st751_hi_wait,
     wait_eeprom_write,
     prepare_for_external,
     abnormal,
@@ -88,6 +87,9 @@ void supply_power_on_demand(int on);
 void STTS751_read_regsiter(unsigned char regsiter,unsigned short *d);
 void update_power_on_demand(info_t* s);
 bool load_eeprom_data(unsigned short search_start);
+
+i2c_operations_t rd1RegCompleteHandler(void *ptr);
+
 
 _io_input_filter g_external_request_input;
 volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
@@ -171,11 +173,11 @@ bool read_log_interval(void)
 {
     unsigned short eerom_validation;
     unsigned char d;
-    for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<0xffff;eerom_validation++) 
+//    for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<0xffff;eerom_validation++) 
         I2C_EEPROM_ReadDataBlock(TIME_INTERVAL_ADDRESS,&d,1);
     LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
-    if(eerom_validation>0x1000)
-        return(false);        
+//    if(eerom_validation>0x1000)
+//        return(false);        
     LOG_DEBUG(UART_puts("d=");UART_put_uint8(d);UART_puts("\n");UART_flush(););
     if(d>0){
         stts_log_interval =(WDT_COUNT_10MINUTES*(unsigned short)d)/DEFAULT_LOG_INTERVAL_MINUTES;
@@ -192,6 +194,9 @@ void state_machine(info_t* s)
     unsigned short d;
     short temperature;
     long s2;
+    unsigned char returnValue;
+    unsigned char reg ;
+    unsigned char i2c_nack_retry;
     switch(s->mainstate){
         case init:
             T1CONbits.TMR1ON = 0;
@@ -273,39 +278,55 @@ void state_machine(info_t* s)
                 PIR1bits.TMR1IF = 0;
                 TMR1 = 0; 
                 switch_clock_to(HF1MHz);
-               i2c_state = 1;
-                s->mainstate = read_st751_status;                
+                s->mainstate = read_st751_status_init;
+                i2c_nack_retry = 3;
             }
             break;
 
-        case read_st751_status:
-            if(i2c_state){
-                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_STATUS,&d);
-            }else{
+        case read_st751_status_init:
+//                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_STATUS,&d);
+//            uint8_t returnValue = 0x00;
+           returnValue = 0x00;
+           reg = STTS751_REGISTER_ADDRESS_STATUS;
+
+            while(!I2C_Open(STTS751_I2C_ADDRESS)); // sit here until we get the bus..
+            I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
+            I2C_SetBuffer(&reg,1);
+            I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+            I2C_MasterWrite();
+//            while(I2C_BUSY == I2C_Close()); // sit here until finished.
+            s->mainstate = read_st751_hi_wait;
+            break;
+        case read_st751_status_wait:
+           if(I2C_BUSY == I2C_Close()){
+               break;
+           }else{
                 LOG_DEBUG(UART_puts("ts751 state=");UART_flush(););
-                LOG_DEBUG(UART_put_HEX16(d);UART_flush(););
+                LOG_DEBUG(UART_put_HEX16(returnValue);UART_flush(););
                 LOG_DEBUG(UART_puts(".\n");UART_flush(););
-                i2c_state = 1;
-                if((d!=0) && ((d&0xff)==0))
-                    s->mainstate = read_st751_hi;
-            }
+                if(i2c_is_nack){
+                    s->mainstate = read_st751_hi_init;
+                }else{
+                    if(--i2c_nack_retry>0){
+                        s->mainstate = read_st751_hi_init;
+                    }else{
+                        s->mainstate = abnormal;
+                    }
+                }
+           }
+            break;
+        case read_st751_hi_init:
+                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_HI,&d);
+                LOG_DEBUG(UART_puts("hi d=");UART_flush(););
+                LOG_DEBUG(UART_put_uint16(d);UART_flush(););
+                LOG_DEBUG(UART_puts(".\n");UART_flush(););
+                temperature = (d&0xff)<<8;
+                s->mainstate = read_st751_lo_init;
+                LOG_DEBUG(s2 = (short )((d&0xff) * 256 ););
             break;
     }
 }
 #if 0
-        case read_st751_hi:
-            if(i2c_state){
-                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_HI,&d);
-            }else{
-                LOG_DEBUG(UART_puts("hi d=");UART_flush(););
-                LOG_DEBUG(UART_put_uint16(d);UART_flush(););
-                LOG_DEBUG(UART_puts(".\n");UART_flush(););
-                i2c_state = 1;
-                temperature = (d&0xff)<<8;
-                s->mainstate = read_st751_lo;
-                LOG_DEBUG(s2 = (short )((d&0xff) * 256 ););
-            }
-            break;
         case read_st751_lo:
             if(i2c_state){
                 STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_LO,&d);
@@ -491,7 +512,7 @@ char* const statename[] = {
 
 void connect_external_state_machine(info_t* s)
 {    
-    if(s->external_need_power && i2c_state==0 ){
+    if(s->external_need_power  ){
         switch(s->mainstate){
             case prepare_for_external:
             case wait_for_external_use_to_be_removed:
@@ -515,11 +536,11 @@ void state_monitor(info_t* s)
         case sleep:
         case wait_for_external_use_to_be_removed:
             break;
-        case read_st751_status:
+        case read_st751_status_wait:
             if(s->in_state_wake_count>28*10)
                 s->mainstate = abnormal;
             break;
-        case read_st751_hi:
+        case read_st751_hi_wait:
             if(s->in_state_wake_count>28*3)
                 s->mainstate = abnormal;
         case wait_eeprom_write:

@@ -195,7 +195,8 @@ int UART_put_uint8(unsigned char d)
         }
         if(disp_digit!=0 || c!=0 ) {
 #ifdef USE_WITH_MCC_UART
-            printf("%c", c + '0' );
+//            printf("%c", c + '0' );
+            UART_putc( c + '0');
 #else
             g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = c + '0';
             g_uart_tx_bk_len++;
@@ -204,7 +205,8 @@ int UART_put_uint8(unsigned char d)
         }
     }
 #ifdef USE_WITH_MCC_UART
-            printf("%c", (unsigned char)d + '0' );
+//            printf("%c", (unsigned char)d + '0' );
+            UART_putc((unsigned char)d + '0' );
 #else
     g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = (unsigned char)d + '0';
     g_uart_tx_bk_len++;
@@ -227,7 +229,8 @@ int UART_put_int8(signed char d)
 #endif
     if(d<0){
 #ifdef USE_WITH_MCC_UART
-            printf("-" );
+//            printf("-" );
+            UART_putc('-' );
 #else
         g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] =  '-';
         g_uart_tx_bk_len++;
@@ -252,7 +255,8 @@ int UART_put_HEX8(unsigned char d)
     c = (d>>4) ;
     c = (c<10) ? (c+'0'):(c+'A'-10);
 #ifdef USE_WITH_MCC_UART
-            printf("%c",c);
+//            printf("%c",c);
+            UART_putc(c);
 #else
     g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] = c;
     g_uart_tx_bk_len++;
@@ -260,7 +264,8 @@ int UART_put_HEX8(unsigned char d)
     c = (d&0xf);
     c = (c<10) ? (c+'0'):(c+'A'-10);
 #ifdef USE_WITH_MCC_UART
-            printf("%c",c);
+//            printf("%c",c);
+           UART_putc(c);
 #else
     g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] = c;
     g_uart_tx_bk_len++;
@@ -307,7 +312,8 @@ int UART_put_uint16(unsigned short d)
         }
         if(disp_digit!=0 || c!=0 ) {
 #ifdef USE_WITH_MCC_UART
-            printf("%c",c+'0');
+//            printf("%c",c+'0');
+            UART_putc(c+'0');
 #else
             g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = c + '0';
             g_uart_tx_bk_len++;
@@ -316,7 +322,8 @@ int UART_put_uint16(unsigned short d)
         }
     }
 #ifdef USE_WITH_MCC_UART
-            putchar((unsigned char)d + '0');
+//            putchar((unsigned char)d + '0');
+            UART_putc((unsigned char)d + '0');
 #else
     g_uart_tx_bk_buf[((g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN)] = (unsigned char)d + '0';
     g_uart_tx_bk_len++;
@@ -339,7 +346,8 @@ int UART_put_int16(short d)
 #endif
     if(d<0){
 #ifdef USE_WITH_MCC_UART
-        printf("-");
+//        printf("-");
+        UART_putc('-');
 #else
         g_uart_tx_bk_buf[(g_uart_tx_bk_ind+g_uart_tx_bk_len)%UART_TX_BK_BUF_LEN] =  '-';
         g_uart_tx_bk_len++;
