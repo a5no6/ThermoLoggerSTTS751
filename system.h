@@ -64,6 +64,16 @@ extern "C" {
 
 //#define ENABLE_MODULE_TEST
 
+    
+typedef struct
+{
+    unsigned i2c_no_nack:1;
+} system_error_t;
+
+extern system_error_t system_error;
+
+#define MAX_I2C_NO_NACK_RETRY   (3)
+    
 #ifdef	__cplusplus
 }
 #endif

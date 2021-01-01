@@ -44,6 +44,7 @@
     SOFTWARE.
 */
 
+#include "../../system.h"
 #include "i2c_master_example.h"
 #include "../../uart_print.h"
 
@@ -58,6 +59,8 @@ static i2c_operations_t rd2RegCompleteHandler(void *ptr);
 static i2c_operations_t wr1RegCompleteHandler(void *ptr);
 static i2c_operations_t wr2RegCompleteHandler(void *ptr);
 static i2c_operations_t rdBlkRegCompleteHandler(void *ptr);
+
+static bool i2c_is_nack;
 
 
 uint8_t I2C_Read1ByteRegister(i2c_address_t address, uint8_t reg)
@@ -181,8 +184,6 @@ static i2c_operations_t wrBlkRegCompleteHandler(void *ptr)
     return I2C_CONTINUE;
 }
 
-bool i2c_is_nack;
-
 static i2c_operations_t i2c_nack_handler(void *ptr)
 {
     i2c_is_nack = false;
@@ -215,22 +216,31 @@ uint8_t make_control_byte(uint32_t  address)
 void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len)
 {
     uint8_t address16[2];
+    unsigned char retry = MAX_I2C_NO_NACK_RETRY;
     address16[0] = (mem_address>>8)&0xff;
     address16[1] = (mem_address       )&0xff;
     i2c_buffer_t bufferBlock; // result is little endian
     bufferBlock.data = data;
     bufferBlock.len = len;
-    i2c_is_nack = true;
+    
+    while((retry--) >0){
+        i2c_is_nack = true;
 
-    while(!I2C_Open(make_control_byte(mem_address))); // sit here until we get the bus..
-    I2C_SetDataCompleteCallback(rdBlkRegCompleteHandler,&bufferBlock);
-    I2C_SetBuffer(address16,2);
-//    I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
-    I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
-    I2C_SetDataNackCallback(i2c_nack_handler,NULL); //NACK polling?
-    I2C_MasterWrite();
-    while(I2C_BUSY == I2C_Close()); // sit here until finished.
-    UART_put_HEX8(i2c_is_nack);UART_puts("\n");
+        while(!I2C_Open(make_control_byte(mem_address))); // sit here until we get the bus..
+        I2C_SetDataCompleteCallback(rdBlkRegCompleteHandler,&bufferBlock);
+        I2C_SetBuffer(address16,2);
+    //    I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
+        I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
+        I2C_SetDataNackCallback(i2c_nack_handler,NULL); //NACK polling?
+        I2C_MasterWrite();
+        while(I2C_BUSY == I2C_Close()); // sit here until finished.
+        UART_put_HEX8(i2c_is_nack);UART_puts("\n");
+        if(i2c_is_nack)
+            break;
+    }
+    if(retry==0){
+        system_error.i2c_no_nack = 1;
+    }
 }
 
 void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t len)

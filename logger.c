@@ -96,6 +96,9 @@ _eeprom_cache_data g_eeprom_cache;
 //unsigned short stts_log_interval = DEFAULT_LOG_INTERVAL_MINUTES*(60/2); /* (60s/2s)*10min */
 unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
 
+system_error_t system_error;
+
+
 void disable_i2c(void){
     SSPCONbits.SSPEN=0;  
 }
