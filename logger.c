@@ -87,14 +87,15 @@ void supply_power_on_demand(int on);
 void STTS751_read_regsiter(unsigned char regsiter,unsigned short *d);
 void update_power_on_demand(info_t* s);
 bool load_eeprom_data(unsigned short search_start);
+void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
 
 i2c_operations_t rd1RegCompleteHandler(void *ptr);
-
 
 _io_input_filter g_external_request_input;
 //volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
 volatile info_t g_info = {false,false,false,false,false,false,read_st751_status_init,dummy,0,0};
 _eeprom_cache_data g_eeprom_cache;
+unsigned char g_eeprom_bk_write_buf[EEPROM_BLOCK_SIZE];
 
 //unsigned short stts_log_interval = DEFAULT_LOG_INTERVAL_MINUTES*(60/2); /* (60s/2s)*10min */
 unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
@@ -143,8 +144,6 @@ void set_pwm_state_monitor_clock(cpu_clock_t clk)
     }
 }
 
-
-
 void switch_clock_to(cpu_clock_t clk)
 {
     const unsigned char isr_val[] = {0b0000,0b1011};
@@ -172,8 +171,6 @@ void switch_clock_to(cpu_clock_t clk)
     PWM3CONbits.PWM3EN = 1;
 #endif
 }
-void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t len);
-
 
 bool read_log_interval(void)
 {
@@ -181,7 +178,7 @@ bool read_log_interval(void)
     unsigned char d;
 //    for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<0xffff;eerom_validation++) 
         I2C_EEPROM_ReadDataBlock(TIME_INTERVAL_ADDRESS,&d,1);
-    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
+//    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
 //    if(eerom_validation>0x1000)
 //        return(false);        
     LOG_DEBUG(UART_puts("d=");UART_put_uint8(d);UART_puts("\n");UART_flush(););
@@ -194,6 +191,52 @@ bool read_log_interval(void)
     return(true);
 }
 
+
+
+char eeprom_que(unsigned char *data,unsigned long address,unsigned short length,unsigned char *buf)
+{
+//    if(i2c_state!=0)
+//        return(0);
+//    data->address = address;
+//    data->length = length;
+    unsigned i;
+    for(i=0;i<EEPROM_BLOCK_SIZE;i++) buf[i] = buf[i];   
+//    i2c_state = 1;
+    LOG_DEBUG(UART_puts("eeprom_que ");)
+    LOG_DEBUG(UART_put_uint16(length);)
+    LOG_DEBUG(UART_puts(" bytes\n");)
+    return(length);
+}
+
+unsigned char flush_buffered_eeprom(void)
+{
+    unsigned char l;
+    if(g_eeprom_cache.eeprom_address_unwritten == g_eeprom_cache.eeprom_address)
+        return(0);
+    if((l=eeprom_que(&g_eeprom_bk_write_buf,(g_eeprom_cache.eeprom_address-1)&0xffffffc0,EEPROM_BLOCK_SIZE,g_eeprom_cache.eeprom_chache))==0)
+        return(0);
+    g_eeprom_cache.eeprom_address_unwritten = g_eeprom_cache.eeprom_address;
+ //   LOG_DEBUG(UART_puts("eeprom flush write from %lx\n",g_eeprom_bk_write_buf.address);)
+    return(l);
+}
+
+unsigned char write_to_buffered_eeprom(unsigned char *d,unsigned char len)
+{
+    int i;
+    unsigned char l = 0;
+    while(len-->0){
+        unsigned char *p = (unsigned char *)(g_eeprom_cache.eeprom_chache +  g_eeprom_cache.eeprom_address%64);
+        *p = d;
+        g_eeprom_cache.eeprom_address ++;
+        if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
+            l = flush_buffered_eeprom();
+            for(i=0;i<EEPROM_BLOCK_SIZE;i++){
+                g_eeprom_cache.eeprom_chache[i] = 0;
+            }
+        }   
+    }
+    return(l); 
+}
 
 void state_machine(info_t* s)
 {
@@ -332,71 +375,91 @@ void state_machine(info_t* s)
              s->mainstate = read_st751_hi_wait;
             break;
         case read_st751_hi_wait:
-                LOG_DEBUG(UART_puts("hi d=");UART_flush(););
+             if(I2C_BUSY == I2C_Close())
+               break;
+            LOG_DEBUG(UART_puts("hi d=");UART_flush(););
+            LOG_DEBUG(UART_put_uint16(returnValue);UART_flush(););
+            LOG_DEBUG(UART_puts(".\n");UART_flush(););
+            if(i2c_is_nack){
+                temperature = (returnValue&0xff)<<8;
+                s->mainstate = read_st751_lo_init;
+                s->mainstate = read_st751_status_init;
+                i2c_nack_retry = 3;
+            }else{
+                if(--i2c_nack_retry>0){
+                    s->mainstate = read_st751_hi_init;
+                }else{
+                    s->mainstate = abnormal;
+                }
+             }
+            break;
+        case read_st751_lo_init:
+             reg = STTS751_REGISTER_ADDRESS_LO;
+             i2c_is_nack = true;
+             I2C_Open(STTS751_I2C_ADDRESS);
+             I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
+             I2C_SetBuffer(&reg,1);
+             I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
+             I2C_MasterWrite();
+             s->mainstate = read_st751_hi_wait;
+             break;
+        case read_st751_lo_wait:
+             if(I2C_BUSY == I2C_Close())
+               break;
+                LOG_DEBUG(UART_puts("lo d=");UART_flush(););
                 LOG_DEBUG(UART_put_uint16(returnValue);UART_flush(););
                 LOG_DEBUG(UART_puts(".\n");UART_flush(););
                 if(i2c_is_nack){
                     temperature = (returnValue&0xff)<<8;
-                    s->mainstate = read_st751_lo_init;
+                    s->mainstate = wait_eeprom_write;
                     s->mainstate = read_st751_status_init;
                     i2c_nack_retry = 3;
+                    g_info.st751_need_power = 0;
+                    s2 = (s2 * 1000)/256;
+                    s->mainstate = wait_eeprom_write;
+                    temperature += (returnValue&0xff);
+                    if(temperature >= 87*0x100){
+                        temperature = 87*0x100;
+                    }
+                    temperature += 40*0x100;
+                    temperature = temperature>>7;
+
+                    if(write_to_buffered_eeprom((unsigned char)temperature,1)>0){
+                        g_info.i2c_need_power = true;
+                    }
+                    LOG_DEBUG(UART_puts("write address ");UART_flush(););
+                    LOG_DEBUG(UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush(););
+                    LOG_DEBUG(UART_puts("\n");UART_flush(););
                 }else{
                     if(--i2c_nack_retry>0){
-                        s->mainstate = read_st751_hi_init;
+                        s->mainstate = read_st751_lo_init;
                     }else{
                         s->mainstate = abnormal;
                     }
                 }
             break;
-    }
-}
-#if 0
-        case read_st751_lo:
-            if(i2c_state){
-                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_LO,&d);
-            }else{
-//                LOG_DEBUG(UART_puts("lo d=%x.\n",d);UART_flush(););
-                g_info.st751_need_power = 0;
-//                LOG_DEBUG(s2 += (d&0xff););
-                s2 = (s2 * 1000)/256;
-//                LOG_DEBUG(UART_puts("%ld.%ld\n", s2/1000,(s2%1000));UART_flush(););
-                s->mainstate = wait_eeprom_write;
-                temperature += (d&0xff);
-//                LOG_DEBUG(UART_puts("%04x",temperature);UART_flush(););
-                if(temperature >= 87*0x100){
-                    temperature = 87*0x100;
-                }
-                temperature += 40*0x100;
-//                LOG_DEBUG(UART_puts("offset:%04x",temperature);UART_flush(););
-                temperature = temperature>>7;
-//                LOG_DEBUG(UART_puts("shift:%04x",temperature);UART_flush(););
-
-                if(write_to_buffered_eeprom((unsigned char)temperature,1)>0){
-                    g_info.i2c_need_power = true;
-                }
-                LOG_DEBUG(UART_puts("write address ");UART_flush(););
-                LOG_DEBUG(UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush(););
-                LOG_DEBUG(UART_puts("\n");UART_flush(););
-            }
-            break;
         case wait_eeprom_write:
-             if(i2c_state){
+             if(I2C_BUSY == I2C_Close())
+               break;
+//             if(i2c_state){
 //                eeprom_write_task(&g_eeprom_bk_write_buf);
-             }else{
-                switch_clock_to(LF31kHz);
-                g_info.i2c_need_power = false;
-                s->mainstate = sleep;
-            }
+//             }else{
+                if(i2c_is_nack){
+                    switch_clock_to(LF31kHz);
+                    g_info.i2c_need_power = false;
+                    s->mainstate = sleep;
+                }
+//            }
             break;
         case prepare_for_external:
-            if(i2c_state==0){
+//            if(i2c_state==0){
                 switch_clock_to(LF31kHz);
                 s->mainstate = wait_for_external_use_to_be_removed;
                 s->i2c_need_power = false;
                 disable_i2c();
-            }else{
-                eeprom_write_task(&g_eeprom_bk_write_buf);                
-            }
+//            }else{
+//                eeprom_write_task(&g_eeprom_bk_write_buf);                
+//            }
             break;
         case abnormal:
             WDTCONbits.WDTPS = WDTPS_VALUE_SLEEP;  //2s
@@ -429,6 +492,7 @@ void input_filter(_io_input_filter *f,unsigned char input)
     }
 }
 
+#if 0
 void interrupt isr(void)
 {
 //    WDTCONbits.SWDTEN = 0;
