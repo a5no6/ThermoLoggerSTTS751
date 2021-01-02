@@ -49,6 +49,8 @@
 #include "interrupt_manager.h"
 #include "mcc.h"
 
+void UART_TX_Interrupt_Handler(void);
+
 void __interrupt() INTERRUPT_InterruptManager (void)
 {
     // interrupt handler
@@ -56,7 +58,8 @@ void __interrupt() INTERRUPT_InterruptManager (void)
     {
         if(PIE1bits.TXIE == 1 && PIR1bits.TXIF == 1)
         {
-            EUSART_TxDefaultInterruptHandler();
+//            EUSART_TxDefaultInterruptHandler();
+            UART_TX_Interrupt_Handler();
         } 
         else if(PIE2bits.BCL1IE == 1 && PIR2bits.BCL1IF == 1)
         {
