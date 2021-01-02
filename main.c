@@ -87,8 +87,8 @@ void main(void)
 
 
 //   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
-//LATCbits.LATC3 = 1;
-//__delay_ms(100);
+LATCbits.LATC3 = 1;
+__delay_ms(10);
     UART_puts("Hello.\n");
 //   while(state!=I2C_EEPROM_WRITE_FINISH)
 //    UART_puts("s1\n");
@@ -99,6 +99,7 @@ void main(void)
         
 //    UART_puts(buf);
    UART_flush();
+//    while(1);
             
    logger_main();
 #if 0

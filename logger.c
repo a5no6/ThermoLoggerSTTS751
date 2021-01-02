@@ -92,7 +92,8 @@ i2c_operations_t rd1RegCompleteHandler(void *ptr);
 
 
 _io_input_filter g_external_request_input;
-volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
+//volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
+volatile info_t g_info = {false,false,false,false,false,false,read_st751_status_init,dummy,0,0};
 _eeprom_cache_data g_eeprom_cache;
 
 //unsigned short stts_log_interval = DEFAULT_LOG_INTERVAL_MINUTES*(60/2); /* (60s/2s)*10min */
@@ -292,13 +293,14 @@ void state_machine(info_t* s)
 //            uint8_t returnValue = 0x00;
            returnValue = 0x00;
            reg = STTS751_REGISTER_ADDRESS_STATUS;
-
+           i2c_is_nack = true;
             I2C_Open(STTS751_I2C_ADDRESS);
             I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
             I2C_SetBuffer(&reg,1);
-            I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
+//            I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
+            I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
             I2C_MasterWrite();
-            s->mainstate = read_st751_hi_wait;
+            s->mainstate = read_st751_status_wait;
             break;
         case read_st751_status_wait:
            if(I2C_BUSY == I2C_Close()){
@@ -320,7 +322,8 @@ void state_machine(info_t* s)
            }
             break;
         case read_st751_hi_init:
-            reg = STTS751_REGISTER_ADDRESS_HI;
+             reg = STTS751_REGISTER_ADDRESS_HI;
+             i2c_is_nack = true;
              I2C_Open(STTS751_I2C_ADDRESS);
              I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
              I2C_SetBuffer(&reg,1);
@@ -522,9 +525,12 @@ char* const statename[] = {
     "sleep",
     "wait_for_external_use_to_be_removed",
     "wait_10ms",
-    "read_st751_status",
-    "read_st751_lo",
-    "read_st751_hi",
+    "read_st751_status_init",
+    "read_st751_status_wait",
+    "read_st751_lo_init",
+    "read_st751_lo_wait",
+    "read_st751_hi_init",
+    "read_st751_hi_wait",
     "wait_eeprom_write",
     "prepare_for_external",
     "abnormal",
@@ -720,5 +726,11 @@ void logger_main(void)
 {
     while(1){
         state_machine(&g_info);
-    }
+//        state_monitor(&g_info);
+        if(g_info.prev_state != g_info.mainstate){
+            LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
+            LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
+            g_info.in_state_wake_count = 0;
+        }
+  }
 }
