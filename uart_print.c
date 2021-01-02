@@ -6,7 +6,7 @@
  * Last Modified 2019/05/04
  */
 
-//#define USE_WITH_MCC_UART
+#define USE_WITH_MCC_UART
 #include <xc.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -20,7 +20,63 @@
 
 #define USE_DEBUG_LONG_TYPE
 
-#ifndef USE_WITH_MCC_UART
+#ifdef USE_WITH_MCC_UART
+void UART_init(unsigned long clk,unsigned long bps)
+{
+#ifdef    __XC8
+    unsigned long dwBaud;
+    unsigned char txie = TXIE;
+    TXIE = 0;
+    while(!EUSART_is_tx_done());
+    SYNC = 0;
+    BRGH = 1;
+    BRG16 = 1;
+    dwBaud = ((clk/4) / bps) - 1;
+    SPBRG = (unsigned char) dwBaud;
+    SPBRGH = (unsigned char)((unsigned short) (dwBaud >> 8));
+    TXEN = 1;
+    SPEN = 1;
+    TXIE = txie;
+#else
+    U1BRG = (((clk/16) / bps) - 1);
+    U1STAbits.UTXISEL = 0b01;//01 = Interrupt is generated and asserted when all characters have been transmitted
+    U1STAbits.UTXEN = 1;
+    U1MODEbits.ON = 1;
+#endif
+}
+
+void UART_TX_BK_TASK(void)
+{
+        EUSART_TxDefaultInterruptHandler();
+}
+
+void UART_putc(const char c)
+{
+    EUSART_Write(c);
+}
+
+bool UART_buf_is_available(unsigned short n)
+{
+    if(eusartTxBufferRemaining>n)
+        return (true);
+    else
+        return(false);
+}
+
+unsigned char is_UART_busy(void)
+{
+    if(EUSART_is_tx_done())
+        return(0);
+    else
+        return(1);
+}
+
+void UART_flush(void)
+{
+    while(is_UART_busy());
+}
+
+#else
 volatile char g_uart_tx_bk_buf[UART_TX_BK_BUF_LEN];
 volatile unsigned short g_uart_tx_bk_len = 0;
 volatile unsigned short g_uart_tx_bk_ind = 0;
@@ -86,94 +142,33 @@ void UART_putc(const unsigned char c)
         TXIE=1;
 #endif
 }
-#else
-
-void UART_init(unsigned long clk,unsigned long bps)
-{
-#ifdef    __XC8
-    unsigned long dwBaud;
-    unsigned char txie = TXIE;
-    TXIE = 0;
-    while(!EUSART_is_tx_done());
-    SYNC = 0;
-    BRGH = 1;
-    BRG16 = 1;
-    dwBaud = ((clk/4) / bps) - 1;
-    SPBRG = (unsigned char) dwBaud;
-    SPBRGH = (unsigned char)((unsigned short) (dwBaud >> 8));
-    TXEN = 1;
-    SPEN = 1;
-    TXIE = txie;
-#else
-    U1BRG = (((clk/16) / bps) - 1);
-    U1STAbits.UTXISEL = 0b01;//01 = Interrupt is generated and asserted when all characters have been transmitted
-    U1STAbits.UTXEN = 1;
-    U1MODEbits.ON = 1;
-#endif
-}
-
-void UART_TX_BK_TASK(void)
-{
-              EUSART_TxDefaultInterruptHandler();
-}
-
-void UART_putc(const char c)
-{
-    /*
-     * Change like below, other wise freeze when buffer gets full.
-    void UART1_Write( uint8_t byte)
-    {
-        while(UART1_IsTxReady() == 0)
-        {
-            return;
-        }
-     * 
-     */
-//    while(UART1_IsTxReady() == false);
-//    asm("di");
-//    UART1_Write(c);
-//    asm("ei");
-    EUSART_Write(c);
-}
-
-#endif
 
 bool UART_buf_is_available(unsigned short n)
 {
-//#ifndef USE_WITH_MCC_UART
     if(g_uart_tx_bk_len+n < UART_TX_BK_BUF_LEN)
         return (true);
-//#endif
-    return(false);
+    else
+        return(false);
 }
 
 unsigned char is_UART_busy(void)
 {
-#ifdef USE_WITH_MCC_UART
-    if(EUSART_is_tx_done())
-        return(0);
-    else
-        return(1);
-#else
     if(g_uart_tx_bk_len==0 && !TX_BUF_FULL &&  TRMT)
         return(0);
     else
         return(1);
-#endif
 }
 
 void UART_flush(void)
 {
     while(is_UART_busy()){
-#ifdef USE_WITH_MCC_UART
-#else
 #ifndef UART_TX_INTERRUPT
         UART_TX_BK_TASK();
 #endif
         CLEAR_WDT;
-#endif
     }
 }
+#endif
 
 void UART_puts(const char *buf)
 {
