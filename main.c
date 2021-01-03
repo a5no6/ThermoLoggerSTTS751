@@ -85,7 +85,7 @@ void main(void)
     // Disable the Peripheral Interrupts
     //INTERRUPT_PeripheralInterruptDisable();
 
-    UART_init(_XTAL_FREQ,38400);
+    UART_init(_XTAL_FREQ,9600);
 
 //   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
 LATCbits.LATC3 = 1;

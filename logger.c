@@ -507,9 +507,10 @@ void state_machine(info_t* s)
                break;
             if(i2c_is_nack){
                 g_eeprom_cache.eeprom_address_unwritten += EEPROM_BLOCK_SIZE;
-                 switch_clock_to(LF31kHz);
-                 g_info.i2c_need_power = false;
-                 s->mainstate = sleep;
+//                 switch_clock_to(LF31kHz);
+//                 g_info.i2c_need_power = false;
+//                 s->mainstate = sleep;
+                s->mainstate = read_st751_status_init;
              }else{
                  if(--i2c_nack_retry>0){
                      s->mainstate = eeprom_write_init;
@@ -848,11 +849,11 @@ void logger_main(void)
             LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
             g_info.in_state_wake_count = 0;
             g_info.prev_state = g_info.mainstate;
-            state_machine(&g_info);
         }else{
             if(g_info.in_state_wake_count<0xffff)
                 g_info.in_state_wake_count++;
                 LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
         }
+         state_machine(&g_info);
   }
 }
