@@ -51,6 +51,12 @@
 #include <stdio.h>
 #include "../i2c_master.h"
 
+typedef struct
+{
+    size_t len;
+    uint8_t *data;
+}i2c_buffer_t;
+
 uint8_t  I2C_Read1ByteRegister(i2c_address_t address, uint8_t reg);
 uint16_t I2C_Read2ByteRegister(i2c_address_t address, uint8_t reg);
 void I2C_Write1ByteRegister(i2c_address_t address, uint8_t reg, uint8_t data);
