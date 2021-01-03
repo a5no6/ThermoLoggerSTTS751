@@ -244,7 +244,7 @@ void I2C_EEPROM_ReadDataBlock(unsigned long mem_address, uint8_t *data, size_t l
         I2C_SetDataNackCallback(i2c_nack_handler,NULL); //NACK polling?
         I2C_MasterWrite();
         while(I2C_BUSY == I2C_Close()); // sit here until finished.
-        UART_put_HEX8(i2c_is_nack);UART_puts("\n");
+//        UART_put_HEX8(i2c_is_nack);UART_puts("\n");
         if(i2c_is_nack)
             break;
     }
@@ -484,7 +484,6 @@ void state_machine(info_t* s)
                 }
             break;
         case eeprom_cache_write:
- 
 //                unsigned char *p = (unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK));
 //                *p = temperature;
                 *((unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK)))  = temperature;
@@ -496,6 +495,7 @@ void state_machine(info_t* s)
                         s->mainstate = sleep;                    
                         s->mainstate = read_st751_status_init;                    
                 }
+                break;
         case eeprom_write_init:
             I2C_EEPROM_WriteDataBlock(
                     (g_eeprom_cache.eeprom_address-1)&0xffffffc0,
@@ -787,10 +787,8 @@ void find_empty_addres(unsigned long *address,unsigned short search_start)
     while (1) {
 		*address = low + step;
 		unsigned char d ;
-#if UART_DEBUG_LEVEL>2
-        UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");
+            LOG_DEBUG(UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");UART_flush();)
         
-#endif
             I2C_EEPROM_ReadDataBlock(*address<search_start? search_start: *address, &d, 1);
             if (d)
                 low = *address;
@@ -812,14 +810,12 @@ void find_empty_addres(unsigned long *address,unsigned short search_start)
             if(search_start>0 && *address < search_start)
                 continue;
             if(g_eeprom_cache.eeprom_chache[step]==0){
-                LOG_DEBUG(UART_puts("find_empty first empty address=");UART_put_HEX32(*address);UART_puts("\n"););
+                LOG_DEBUG(UART_puts("find_empty first empty address=");UART_put_HEX32(*address);UART_puts("\n");UART_flush(););
                 return;
             }
         }
     }    
-#if UART_DEBUG_LEVEL>2
-    UART_puts("find_empty could not find empty address\n");
-#endif
+    LOG_DEBUG(UART_puts("find_empty could not find empty address\n");UART_flush();)
     *address = EEPROM_SIZE_BYTE;        
 }
 
@@ -828,25 +824,32 @@ bool load_eeprom_data(unsigned short search_start)
     long a;
     find_empty_addres(&g_eeprom_cache.eeprom_address,search_start);
     a = g_eeprom_cache.eeprom_address;
-    if(a>=1){
+/*    if(a>=1){
         g_eeprom_cache.eeprom_address_unwritten = a;
         a -= 1;
+        UART_put_HEX32(a&0x1ffc0);UART_puts("\n");UART_flush();
         I2C_EEPROM_ReadDataBlock(a&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
-    }
-        I2C_EEPROM_ReadDataBlock(g_eeprom_cache.eeprom_address&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+    }*/
+        g_eeprom_cache.eeprom_address_unwritten = a;
+        if(g_eeprom_cache.eeprom_address%64>0){
+            UART_put_HEX32(g_eeprom_cache.eeprom_address&0x1ffc0);UART_puts("\n");UART_flush();
+            I2C_EEPROM_ReadDataBlock(g_eeprom_cache.eeprom_address&0x1ffc0,g_eeprom_cache.eeprom_chache,EEPROM_BLOCK_SIZE);
+        }
     return(true);
 }
 
 
 void logger_main(void)
 {
+    load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
-        state_machine(&g_info);
 //        state_monitor(&g_info);
         if(g_info.prev_state != g_info.mainstate){
             LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
             LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
             g_info.in_state_wake_count = 0;
+            g_info.prev_state = g_info.mainstate;
+            state_machine(&g_info);
         }
   }
 }
