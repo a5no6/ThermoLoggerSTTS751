@@ -470,11 +470,7 @@ void state_machine(info_t* s)
                     }
                     temperature += 40*0x100;
                     temperature = temperature>>7;
-
                      s->mainstate = eeprom_cache_write;
-                    LOG_DEBUG(UART_puts("write address ");UART_flush(););
-                    LOG_DEBUG(UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush(););
-                    LOG_DEBUG(UART_puts("\n");UART_flush(););
                 }else{
                     if(--i2c_nack_retry>0){
                         s->mainstate = read_st751_lo_init;
@@ -486,6 +482,9 @@ void state_machine(info_t* s)
         case eeprom_cache_write:
 //                unsigned char *p = (unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK));
 //                *p = temperature;
+                    LOG_DEBUG(UART_puts("write address ");UART_flush(););
+                    LOG_DEBUG(UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush(););
+                    LOG_DEBUG(UART_puts("\n");UART_flush(););
                 *((unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK)))  = temperature;
                 g_eeprom_cache.eeprom_address ++;
                 if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
@@ -843,13 +842,17 @@ void logger_main(void)
 {
     load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
+        asm("CLRWDT");
 //        state_monitor(&g_info);
         if(g_info.prev_state != g_info.mainstate){
             LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
-            LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
             g_info.in_state_wake_count = 0;
             g_info.prev_state = g_info.mainstate;
             state_machine(&g_info);
+        }else{
+            if(g_info.in_state_wake_count<0xffff)
+                g_info.in_state_wake_count++;
+                LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
         }
   }
 }
