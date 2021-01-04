@@ -508,8 +508,8 @@ void state_machine(info_t* s)
                 break;
         case eeprom_write_init:
             I2C_EEPROM_WriteDataBlock(
-                    (g_eeprom_cache.eeprom_address-1)&0xffffffc0,
-                    g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK],
+                    g_eeprom_cache.eeprom_address_unwritten,
+                    &g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK],
                     g_eeprom_cache.eeprom_address-g_eeprom_cache.eeprom_address_unwritten);
             UART_puts("EEPROM write ");
             UART_put_HEX32((g_eeprom_cache.eeprom_address-1)&0xffffffc0);
@@ -907,7 +907,8 @@ void logger_main(void)
 {
     
 
-    read_out();
+  //  read_out();
+  //  write_zeros();
     load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
         asm("CLRWDT");
