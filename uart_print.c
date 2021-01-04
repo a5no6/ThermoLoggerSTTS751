@@ -6,7 +6,7 @@
  * Last Modified 2019/05/04
  */
 
-//#define USE_WITH_MCC_UART
+#define USE_WITH_MCC_UART
 #include <xc.h>
 #include <stdbool.h>
 #include <stdint.h>

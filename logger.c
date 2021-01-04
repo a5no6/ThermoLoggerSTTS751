@@ -287,11 +287,7 @@ bool read_log_interval(void)
 {
     unsigned short eerom_validation;
     unsigned char d;
-//    for(i2c_state=1,eerom_validation=0;i2c_state&& eerom_validation<0xffff;eerom_validation++) 
         I2C_EEPROM_ReadDataBlock(TIME_INTERVAL_ADDRESS,&d,1);
-//    LOG_DEBUG(UART_puts(__FILE__);UART_puts(":");UART_put_uint16(__LINE__);UART_puts(" validation:");UART_put_HEX16(eerom_validation);UART_puts("\n");)
-//    if(eerom_validation>0x1000)
-//        return(false);        
     LOG_DEBUG(UART_puts("d=");UART_put_uint8(d);UART_puts("\n");UART_flush(););
     if(d>0){
         stts_log_interval =(WDT_COUNT_10MINUTES*(unsigned short)d)/DEFAULT_LOG_INTERVAL_MINUTES;
@@ -866,9 +862,52 @@ bool load_eeprom_data(unsigned short search_start)
     return(true);
 }
 
+unsigned char zeros[64];
+
+void write_zeros(void)
+{
+    unsigned long ad ;
+    for(ad=0;ad<0x20000;ad+=64){
+          I2C_EEPROM_WriteDataBlock(ad,zeros,64);
+          while(I2C_BUSY == I2C_Close());
+          if(ad%1024==0){
+              UART_put_HEX32(ad);
+              UART_puts("\n");
+              UART_flush();
+          }
+    }        
+}
+
+void read_out(void)
+{
+    unsigned char i;
+    unsigned char is_first;
+    unsigned long ad ;
+    for(ad=0;ad<0x20000;ad+=64){
+          I2C_EEPROM_ReadDataBlock(ad,zeros,64);
+          while(I2C_BUSY == I2C_Close());
+          is_first = true;
+          for(i=0;i<64;i++){
+              if(zeros[i]==0)
+                  continue;
+              if(is_first){
+                  is_first = false;
+                  UART_put_HEX32(ad);
+                  UART_puts(" ");
+              }
+              UART_put_HEX8(zeros[i]);
+              UART_flush();
+          }
+          if(!is_first)
+              UART_puts("\n");
+    }        
+}
 
 void logger_main(void)
 {
+    
+
+    read_out();
     load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
         asm("CLRWDT");
