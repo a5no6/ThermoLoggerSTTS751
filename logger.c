@@ -130,6 +130,18 @@ unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
 
 system_error_t system_error;
 
+void dump_eeprom_cache(void)
+{
+    int i;
+    for(i=0;i<128;i++){
+        UART_put_HEX8(g_eeprom_cache.eeprom_chache[i]);
+        UART_puts(" ");
+        UART_flush();
+    }
+        UART_puts("\n");
+        UART_flush();
+}
+
 static i2c_operations_t i2c_nack_handler(void *ptr)
 {
     i2c_is_nack = false;
@@ -480,11 +492,14 @@ void state_machine(info_t* s)
                 }
             break;
         case eeprom_cache_write:
-//                unsigned char *p = (unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK));
-//                *p = temperature;
-                    LOG_DEBUG(UART_puts("write address ");UART_flush(););
-                    LOG_DEBUG(UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush(););
-                    LOG_DEBUG(UART_puts("\n");UART_flush(););
+                   LOG_DEBUG(UART_puts("write address ");UART_flush();
+                        UART_put_HEX32(g_eeprom_cache.eeprom_address);UART_flush();
+                        UART_puts(" ");
+                        UART_put_uint8(g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK);UART_flush();
+                        UART_puts(" ");
+                        UART_put_uint8(temperature);
+                        UART_puts("\n");UART_flush();
+                   );
                 *((unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK)))  = temperature;
                 g_eeprom_cache.eeprom_address ++;
                 if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
@@ -498,8 +513,21 @@ void state_machine(info_t* s)
         case eeprom_write_init:
             I2C_EEPROM_WriteDataBlock(
                     (g_eeprom_cache.eeprom_address-1)&0xffffffc0,
-                    g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address+EEPROM_BLOCK_SIZE)&EEPROM_RING_BUF_MASK],
-                    EEPROM_BLOCK_SIZE);
+                    g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK],
+                    g_eeprom_cache.eeprom_address-g_eeprom_cache.eeprom_address_unwritten);
+            UART_puts("EEPROM write ");
+            UART_put_HEX32((g_eeprom_cache.eeprom_address-1)&0xffffffc0);
+            UART_puts(" ");
+             UART_put_uint8((g_eeprom_cache.eeprom_address+EEPROM_BLOCK_SIZE)&EEPROM_RING_BUF_MASK);
+            UART_puts(" ");
+            LOG_DEBUG(
+                for(s2=0;s2<EEPROM_BLOCK_SIZE;s2++){
+                    UART_put_uint8(g_eeprom_cache.eeprom_chache[((g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK)+s2]);
+                    UART_puts(" ");
+                  UART_flush();
+                }
+                UART_puts("\n");
+                );
             s->mainstate = eeprom_write_wait;
             break;
         case eeprom_write_wait:
