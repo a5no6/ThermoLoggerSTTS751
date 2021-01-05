@@ -61,7 +61,7 @@ bool load_eeprom_data(unsigned short search_start);
 
 const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
-void logger_main(void);
+inline void logger_main(void);
 
 #define EEPROM_SIZE_BYTE	(0x20000)
 
