@@ -106,7 +106,8 @@ typedef struct {
     bool external_need_power;
     bool initialize_request;
     state_t mainstate;
-    state_t prev_state;
+    state_t prev_state;            // To monitor state transition
+    state_t return_to_state;   // To call function like states
     unsigned short wdt_wake_count;
     unsigned short in_state_wake_count;
 } info_t;
@@ -145,6 +146,8 @@ unsigned char g_eeprom_bk_write_buf[EEPROM_BLOCK_SIZE];
 unsigned short stts_log_interval = 0; /* (60s/2s)*10min */
 
 system_error_t system_error;
+
+unsigned short wc = 0;
 
 void dump_eeprom_cache(void)
 {
@@ -408,15 +411,12 @@ void state_machine(info_t* s)
             break;
 
         case read_st751_status_init:
-//                STTS751_read_regsiter(STTS751_REGISTER_ADDRESS_STATUS,&d);
-//            uint8_t returnValue = 0x00;
            returnValue = 0x00;
            reg = STTS751_REGISTER_ADDRESS_STATUS;
            i2c_is_nack = true;
             I2C_Open(STTS751_I2C_ADDRESS);
             I2C_SetDataCompleteCallback(rd1RegCompleteHandler,&returnValue);
             I2C_SetBuffer(&reg,1);
-//            I2C_SetAddressNackCallback(i2c_nack_handler,NULL); //NACK polling?
             I2C_SetAddressNackCallback(NULL,NULL); //NACK polling?
             I2C_MasterWrite();
             s->mainstate = read_st751_status_wait;
@@ -495,6 +495,7 @@ void state_machine(info_t* s)
                     temperature += 40*0x100;
                     temperature = temperature>>7;
                      s->mainstate = eeprom_cache_write;
+                     wc++;
                 }else{
                     if(--i2c_nack_retry>0){
                         s->mainstate = read_st751_lo_init;
@@ -517,6 +518,7 @@ void state_machine(info_t* s)
                 if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
                         g_info.i2c_need_power = true;
                         s->mainstate = eeprom_write_init;
+                        s->return_to_state = read_st751_status_init;
                 }   else{
                         s->mainstate = sleep;                    
                         s->mainstate = read_st751_status_init;                    
@@ -550,7 +552,7 @@ void state_machine(info_t* s)
 //                 switch_clock_to(LF31kHz);
 //                 g_info.i2c_need_power = false;
 //                 s->mainstate = sleep;
-                s->mainstate = read_st751_status_init;
+                s->mainstate = s->return_to_state;
              }else{
                  if(--i2c_nack_retry>0){
                      s->mainstate = eeprom_write_init;
@@ -560,14 +562,10 @@ void state_machine(info_t* s)
              }
           break;
         case prepare_for_external:
-//            if(i2c_state==0){
                 switch_clock_to(LF31kHz);
                 s->mainstate = wait_for_external_use_to_be_removed;
                 s->i2c_need_power = false;
                 disable_i2c();
-//            }else{
-//                eeprom_write_task(&g_eeprom_bk_write_buf);                
-//            }
             break;
         case abnormal:
             g_info.st751_need_power = 0;
@@ -602,13 +600,11 @@ void input_filter(_io_input_filter *f,unsigned char input)
     }
 }
 
-#if 0
-void interrupt isr(void)
+void  IOC_InterruptHandler(void)
 {
-//    WDTCONbits.SWDTEN = 0;
     LATAbits.LATA2 = 1;
     if(INTCONbits.IOCIF && IOCAFbits.IOCAF3){
-        LOG_DEBUG(UART_puts("IOCAF3\n"););
+//        LOG_DEBUG(UART_puts("IOCAF3\n"););
         g_external_request_input.count = 0;
         while(g_external_request_input.count < INPUT_FILTER_THRESH)
             input_filter(&g_external_request_input,PORTAbits.RA3);
@@ -623,46 +619,8 @@ void interrupt isr(void)
         INTCONbits.IOCIF = 0;
         IOCAF = 0;
     }
-#ifdef UART_TX_INTERRUPT
-    UART_TX_Interrupt_Handler();
-#endif
     LATAbits.LATA2 = 0;
 }
-
-void init_peripheral(void)
-{
-    INTCONbits.IOCIF = 0;
-    IOCAF = 0;
-    T1CONbits.TMR1CS = 1; // Fosc
-    INTCONbits.IOCIE = 1; // only interrupt;
-    IOCAPbits.IOCAP3 = 1;
-    IOCANbits.IOCAN3 = 1;
-#ifdef UART_TX_INTERRUPT
-    TXIE = 1;
-#endif
-}
-
-void init_i2c(void)
-{
-    //	PORT C Assignments
-    ANSELCbits.ANSC0 = 0;
-    ANSELCbits.ANSC1 = 0;
-    TRISCbits.TRISC0 = 1; // 
-    TRISCbits.TRISC1 = 1; //  SCL signal to SEE (must be set as input)
-
-    RC0PPS = RXXPPS_SOURCE_SDA;
-    RC1PPS = RXXPPS_SOURCE_SCL;
-    SSPDATPPSbits.SSPDATPPS = PPS_INPUT_RC0;
-    SSPCLKPPSbits.SSPCLKPPS = PPS_INPUT_RC1;
-
-    SSPCONbits.SSPM=0x08;       // I2C Master mode, clock = Fosc/(4 * (SSPADD+1))
-    SSPCONbits.SSPEN=1;         // enable MSSP port
-
-    // Solving for SSPADD = [(16000000/100000)-4]/4 and we get SSPADD = 39
-    SSPADD = ((_XTAL_FREQ/I2C_FREQ)-4)/4;                // set Baud rate clock divider
-}
-
-#endif
 
 void supply_power_on_demand(int on)
 {
@@ -923,8 +881,8 @@ inline void logger_main(void)
 {
     
 
-  //  read_out();
-  //  write_zeros();
+ //   read_out();
+ //  write_zeros();
     load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
         asm("CLRWDT");
@@ -939,5 +897,6 @@ inline void logger_main(void)
                 LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
         }
          state_machine(&g_info);
-  }
+//         connect_external_state_machine();
+    }
 }

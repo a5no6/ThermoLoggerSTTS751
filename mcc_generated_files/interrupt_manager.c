@@ -50,6 +50,7 @@
 #include "mcc.h"
 
 void UART_TX_Interrupt_Handler(void);
+void  IOC_InterruptHandler(void);
 
 void __interrupt() INTERRUPT_InterruptManager (void)
 {
@@ -68,6 +69,10 @@ void __interrupt() INTERRUPT_InterruptManager (void)
         else if(PIE1bits.SSP1IE == 1 && PIR1bits.SSP1IF == 1)
         {
             MSSP_InterruptHandler();
+        } 
+        else if(INTCONbits.IOCIE == 1 && INTCONbits.IOCIF == 1)
+        {
+            IOC_InterruptHandler();
         } 
         else
         {

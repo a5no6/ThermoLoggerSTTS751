@@ -3,7 +3,7 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>pic16_test</name>
+            <name>ThermoLoggerSTTS751</name>
             <creation-uuid>3a3319e3-bbe8-431c-a98c-b0d7a58aa074</creation-uuid>
             <make-project-type>0</make-project-type>
             <c-extensions>c</c-extensions>
