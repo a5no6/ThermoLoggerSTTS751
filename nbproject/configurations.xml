@@ -45,10 +45,6 @@
         <itemPath>mcc_generated_files/eusart.c</itemPath>
         <itemPath>mcc_generated_files/tmr6.c</itemPath>
       </logicalFolder>
-      <logicalFolder name="f1" displayName="non_mcc" projectFiles="true">
-        <itemPath>non_mcc/i2c_eeprom.h</itemPath>
-        <itemPath>stts751.c</itemPath>
-      </logicalFolder>
       <itemPath>main.c</itemPath>
       <itemPath>logger.c</itemPath>
       <itemPath>uart_print.c</itemPath>
