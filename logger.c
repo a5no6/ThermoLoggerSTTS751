@@ -379,11 +379,13 @@ void state_machine(info_t* s)
             }
             break;
         case sleep:
-            LOG_DEBUG(UART_puts("going sleep.\n");UART_flush(););
-            sleep_after_uart_send();
+            if(!s->is_waked_by_ra3){
+                LOG_DEBUG(UART_puts("going sleep.\n");UART_flush(););
+                sleep_after_uart_send();
+            }
             if(s->is_waked_by_ra3){ 
                 LOG_DEBUG(UART_puts("woken up with ra3.\n");UART_flush(););
-                s->is_waked_by_ra3 = false;            
+                s->is_waked_by_ra3 = false;   // clear flag. 
             }else{ // waked by WDT
                 if(g_info.wdt_wake_count<0xffff)
                     g_info.wdt_wake_count++;        
