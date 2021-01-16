@@ -55,7 +55,11 @@ void  IOC_InterruptHandler(void);
 void __interrupt() INTERRUPT_InterruptManager (void)
 {
     // interrupt handler
-    if(INTCONbits.PEIE == 1)
+    if(INTCONbits.IOCIE == 1 && INTCONbits.IOCIF == 1)
+    {
+        PIN_MANAGER_IOC();
+    }
+    else if(INTCONbits.PEIE == 1)
     {
         if(PIE1bits.TXIE == 1 && PIR1bits.TXIF == 1)
         {
@@ -69,10 +73,6 @@ void __interrupt() INTERRUPT_InterruptManager (void)
         else if(PIE1bits.SSP1IE == 1 && PIR1bits.SSP1IF == 1)
         {
             MSSP_InterruptHandler();
-        } 
-        else if(INTCONbits.IOCIE == 1 && INTCONbits.IOCIF == 1)
-        {
-            IOC_InterruptHandler();
         } 
         else
         {

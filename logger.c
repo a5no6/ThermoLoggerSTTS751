@@ -892,6 +892,8 @@ const unsigned char test_string[64] = "Hello EEPROM 512.\n";
 unsigned char buf[64];
 #define EEPROM_SIZE_BYTE	(0x20000)
 
+void IOCAF3_SetInterruptHandler(void (* InterruptHandler)(void));
+
 inline void logger_main(void)
 {
     
@@ -916,6 +918,7 @@ __delay_ms(10);
  //   read_out();
  //  write_zeros();
     WDTCONbits.SWDTEN = 1;
+    IOCAF3_SetInterruptHandler(IOC_InterruptHandler);
 //    read_log_interval(); 
     while(1){
         asm("CLRWDT");
