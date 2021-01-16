@@ -891,6 +891,7 @@ inline void logger_main(void)
 
  //   read_out();
  //  write_zeros();
+    WDTCONbits.SWDTEN = 1;
     load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
     while(1){
         asm("CLRWDT");
