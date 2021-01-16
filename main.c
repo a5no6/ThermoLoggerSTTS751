@@ -59,11 +59,8 @@ void I2C_EEPROM_WriteDataBlock(unsigned long mem_address, uint8_t *data, size_t 
 bool load_eeprom_data(unsigned short search_start);
 
 
-const unsigned char test_string[64] = "Hello EEPROM 512.\n";
-unsigned char buf[64];
 inline void logger_main(void);
 
-#define EEPROM_SIZE_BYTE	(0x20000)
 
 void main(void)
 {
@@ -85,23 +82,6 @@ void main(void)
     // Disable the Peripheral Interrupts
     //INTERRUPT_PeripheralInterruptDisable();
 
-    UART_init(_XTAL_FREQ,9600);
-
-//   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
-LATCbits.LATC3 = 1;
-__delay_ms(10);
-    UART_puts("Hello.\n");
-//   while(state!=I2C_EEPROM_WRITE_FINISH)
-//    UART_puts("s1\n");
-//        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
-//    UART_puts("s2\n");
-//       I2C_EEPROM_ReadDataBlock(0,buf ,32);
-//    UART_puts("s3\n");
-        
-//    UART_puts(buf);
-   UART_flush();
-//    while(1);
-            
    logger_main();
 #if 0
     unsigned short d;

@@ -89,7 +89,12 @@ unsigned char is_UART_busy(void)
 
 void UART_flush(void)
 {
-    while(is_UART_busy());
+    while(is_UART_busy())
+#ifdef    __XC8
+        asm("CLRWDT");
+#else
+    CLRWDT
+#endif
 }
 
 #else

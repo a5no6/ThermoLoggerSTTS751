@@ -137,8 +137,8 @@ i2c_operations_t wrBlkRegCompleteHandler(void *ptr);
 i2c_operations_t rdBlkRegCompleteHandler(void *ptr);
 
 _io_input_filter g_external_request_input;
-//volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
-volatile info_t g_info = {false,false,false,false,false,false,read_st751_status_init,dummy,0,0};
+volatile info_t g_info = {false,false,false,false,false,false,init,dummy,0,0};
+//volatile info_t g_info = {false,false,false,false,false,false,read_st751_status_init,dummy,0,0};
 _eeprom_cache_data g_eeprom_cache;
 unsigned char g_eeprom_bk_write_buf[EEPROM_BLOCK_SIZE];
 
@@ -526,10 +526,13 @@ void state_machine(info_t* s)
                 if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
                         g_info.i2c_need_power = true;
                         s->mainstate = eeprom_write_init;
-                        s->return_to_state = read_st751_status_init;
+                        s->return_to_state = sleep;
                 }   else{
+                    UART_flush();
+                        switch_clock_to(LF31kHz);
+//                        switch_clock_to(HF1MHz);
+                        g_info.i2c_need_power = false;
                         s->mainstate = sleep;                    
-                        s->mainstate = read_st751_status_init;                    
                 }
                 break;
         case eeprom_write_init:
@@ -557,9 +560,9 @@ void state_machine(info_t* s)
                break;
             if(i2c_is_nack){
                 g_eeprom_cache.eeprom_address_unwritten += EEPROM_BLOCK_SIZE;
-//                 switch_clock_to(LF31kHz);
-//                 g_info.i2c_need_power = false;
-//                 s->mainstate = sleep;
+                 switch_clock_to(LF31kHz);
+                 g_info.i2c_need_power = false;
+                 s->mainstate = sleep;
                 s->mainstate = s->return_to_state;
              }else{
                  if(--i2c_nack_retry>0){
@@ -793,7 +796,7 @@ void find_empty_addres(unsigned long *address,unsigned short search_start)
     while (1) {
 		*address = low + step;
 		unsigned char d ;
-            LOG_DEBUG(UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");UART_flush();)
+//            LOG_DEBUG(UART_puts("find_empty low=");UART_put_HEX32(low);UART_puts(",high=");UART_put_HEX32(high);UART_puts(",step=");UART_put_HEX32(step);UART_puts("\n");UART_flush();)
         
             I2C_EEPROM_ReadDataBlock(*address<search_start? search_start: *address, &d, 1);
             if (d)
@@ -885,14 +888,35 @@ void read_out(void)
     }        
 }
 
+const unsigned char test_string[64] = "Hello EEPROM 512.\n";
+unsigned char buf[64];
+#define EEPROM_SIZE_BYTE	(0x20000)
+
 inline void logger_main(void)
 {
     
+    UART_init(_XTAL_FREQ,UART_BPS);
+
+//   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
+//LATCbits.LATC3 = 1;
+__delay_ms(10);
+    UART_puts("Hello.\n");
+//   while(state!=I2C_EEPROM_WRITE_FINISH)
+//    UART_puts("s1\n");
+//        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
+//    UART_puts("s2\n");
+//       I2C_EEPROM_ReadDataBlock(0,buf ,32);
+//    UART_puts("s3\n");
+        
+//    UART_puts(buf);
+   UART_flush();
+//    while(1);
+            
 
  //   read_out();
  //  write_zeros();
     WDTCONbits.SWDTEN = 1;
-    load_eeprom_data(EEPROM_HEADER_BLOCK_SIZE); 
+//    read_log_interval(); 
     while(1){
         asm("CLRWDT");
 //        state_monitor(&g_info);

@@ -40,7 +40,7 @@ extern "C" {
 #define ENABLE_LOG_PWM
     
 #define I2C_FREQ    (100000)
-#define UART_BPS    (310*8)
+#define UART_BPS    (600)
 #define _XTAL_FREQ  (1000000)
 #define EEPROM_SIZE_BYTE	(0x20000)
 #define DEFAULT_LOG_INTERVAL_MINUTES    (10)
