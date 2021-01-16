@@ -386,6 +386,12 @@ void state_machine(info_t* s)
             if(s->is_waked_by_ra3){ 
                 LOG_DEBUG(UART_puts("woken up with ra3.\n");UART_flush(););
                 s->is_waked_by_ra3 = false;   // clear flag. 
+                if(g_eeprom_cache.eeprom_address != g_eeprom_cache.eeprom_address_unwritten ){
+                    s->return_to_state = wait_for_external_use_to_be_removed;
+                    s->mainstate = eeprom_write_init;
+                }else{
+                    s->mainstate = wait_for_external_use_to_be_removed;                    
+                }
             }else{ // waked by WDT
                 if(g_info.wdt_wake_count<0xffff)
                     g_info.wdt_wake_count++;        
