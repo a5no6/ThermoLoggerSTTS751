@@ -53,8 +53,7 @@
   Section: Macro Declarations
 */
 
-//#define EUSART_TX_BUFFER_SIZE 64
-#define EUSART_TX_BUFFER_SIZE 255
+#define EUSART_TX_BUFFER_SIZE 64
 #define EUSART_RX_BUFFER_SIZE 8
 
 /**
@@ -138,6 +137,7 @@ uint8_t EUSART_Read(void)
 {
     while(!PIR1bits.RCIF)
     {
+        CLRWDT();
     }
 
     eusartRxLastError.status = 0;
@@ -157,6 +157,7 @@ void EUSART_Write(uint8_t txData)
 {
     while(0 == eusartTxBufferRemaining)
     {
+        CLRWDT();
     }
 
     if(0 == PIE1bits.TXIE)
