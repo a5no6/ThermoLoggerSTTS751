@@ -31,6 +31,7 @@ SOFTWARE.
 #include "uart_print.h"
 #include "stts751.h"
 #include"mcc_generated_files/examples/i2c_master_example.h"
+#include "mcc_generated_files/pin_manager.h"
 
 #define EEPROM_HEADER_BLOCK_SIZE    (16)
 #define TIME_INTERVAL_ADDRESS   (14)
@@ -708,87 +709,6 @@ void state_monitor(info_t* s)
     }
 }
 
-#if 0
-
-void main(void) 
-{   
-    TRISCbits.TRISC4 = 0;
-    ANSELCbits.ANSC4 = 0;
-    TRISAbits.TRISA2 = 0;
-    ANSELAbits.ANSA2 = 0;
-
-#ifdef ENABLE_LOG_PWM
-    TRISCbits.TRISC5 = 0;
-    ANSELCbits.ANSC5 = 0;
-    RC5PPS = 0b01110; //PWM3OUT
-    T2CONbits.T2CKPS = 0b00; // 00=1:1,01=1:4,10=1:16,11=1:64
-//    PR2 = 19; //31kHz = 31000/80 (2.6ms),  1MHz = 1000/64/10 (1.3ms))
-//    PR2 = 49; //31kHz = 31000/80 (2.6ms),  1MHz = 1000/64/10 (1.3ms))
-    PR2 = 99; //31kHz = 31000/80 (2.6ms),  1MHz = 1000/64/10 (1.3ms))
-    T2CONbits.TMR2ON = 1;
-    PWM3DCL = 0;
-    PWM3CONbits.PWM3EN = 1;
-    PWM3CONbits.PWM3OUT = 1;
-#endif
-    init_power_on_demand();
-    if(PORTAbits.RA3==0){
-        supply_power_on_demand(1);
-        g_info.external_need_power = true;
-    }
-
-    // set up oscillator control register
-    WDTCONbits.WDTPS = WDTPS_VALUE_WAKE;
-    VREGPM = 1; //Low-Power Sleep mode enabled in Sleep.Draws lowest current in Sleep, slower wake-up
-
-    switch_clock_to(LF31kHz);
-
-    init_peripheral();
-    TRISCbits.TRISC2 = 0;
-    RC2PPS = 0b10100; // TX;
-    init_i2c();
-    WPUA = 0b00001000;
-    WPUC = 0;
-    OPTION_REGbits.nWPUEN = 0;
-    INTCONbits.GIE = 1;
-    INTCONbits.PEIE = 1;
-    LOG_INFO(UART_puts("uart enabled.\n");UART_flush(););
-
-    g_info.prev_state = init;
-    while(1){
-        state_machine(&g_info);
-#ifdef ENABLE_LOG_PWM
-        PWM3DCH = g_info.mainstate;
-#endif
-        connect_external_state_machine(&g_info);
-        update_power_on_demand(&g_info);
-        asm("CLRWDT");
-//        LOG_DEBUG(if(g_info.prev_state != g_info.mainstate){UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();});           
-        if(g_info.prev_state != g_info.mainstate){
-            LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
-            LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
-            g_info.in_state_wake_count = 0;
-        }else{
-            if(g_info.in_state_wake_count<0xffff)
-                g_info.in_state_wake_count++;
-            state_monitor(&g_info);
-            if(g_info.prev_state != g_info.mainstate){
-                LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
-                LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
-                g_info.in_state_wake_count = 0;
-            }
-        }
-        g_info.prev_state = g_info.mainstate;
-#ifndef UART_TX_INTERRUPT
-        UART_TX_BK_TASK();
-#endif
-            PIN_CHECK = 1 - PIN_CHECK;
-    }
-    LOG_INFO(UART_puts("end of main\n");UART_flush(););
-    while(1);
- }
-
-#endif
-
 void find_empty_addres(unsigned long *address,unsigned short search_start)
 {
     long low = 0, high = EEPROM_SIZE_BYTE, step = EEPROM_SIZE_BYTE / 2;
@@ -888,41 +808,40 @@ void read_out(void)
     }        
 }
 
-const unsigned char test_string[64] = "Hello EEPROM 512.\n";
-unsigned char buf[64];
-#define EEPROM_SIZE_BYTE	(0x20000)
-
-void IOCAF3_SetInterruptHandler(void (* InterruptHandler)(void));
+#define INIT_EEPROM
+#define READ_EEPROM
+#ifdef INIT_EEPROM
+static const unsigned char test_header[16] = {1,0,0,0,  0,0,0,0,0,0,0,0,  0,0,10,0};
+#endif
 
 inline void logger_main(void)
 {
     
     UART_init(_XTAL_FREQ,UART_BPS);
 
-//   enum i2c_eeprom_write_state  state = I2C_EEPROM_WRITE_INIT;
-//LATCbits.LATC3 = 1;
 __delay_ms(10);
     UART_puts("Hello.\n");
-//   while(state!=I2C_EEPROM_WRITE_FINISH)
-//    UART_puts("s1\n");
-//        I2C_EEPROM_WriteDataBlock(0,test_string ,32);
-//    UART_puts("s2\n");
-//       I2C_EEPROM_ReadDataBlock(0,buf ,32);
-//    UART_puts("s3\n");
-        
-//    UART_puts(buf);
-   UART_flush();
-//    while(1);
-            
+     
+#ifdef INIT_EEPROM
+    LATCbits.LATC3 = 1;
+    write_zeros();
+    I2C_EEPROM_WriteDataBlock(0,test_header ,16);
+    while(I2C_BUSY != I2C_Close());
+    UART_puts("Header written.\n");    
 
- //   read_out();
- //  write_zeros();
-    WDTCONbits.SWDTEN = 1;
+    LATCbits.LATC3 = 0;
+#endif
+#ifdef READ_EEPROM
+    LATCbits.LATC3 = 1;
+    read_out();
+    LATCbits.LATC3 = 0;
+#endif
+    
+   UART_flush();
+   WDTCONbits.SWDTEN = 1;
     IOCAF3_SetInterruptHandler(IOC_InterruptHandler);
-//    read_log_interval(); 
     while(1){
         asm("CLRWDT");
-//        state_monitor(&g_info);
         if(g_info.prev_state != g_info.mainstate){
             LOG_DEBUG(UART_puts("state ");UART_puts(statename[g_info.prev_state]);UART_puts("->");UART_puts(statename[g_info.mainstate]);UART_puts("\n");UART_flush();); 
             g_info.in_state_wake_count = 0;
@@ -933,6 +852,9 @@ __delay_ms(10);
                 LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
         }
          state_machine(&g_info);
-//         connect_external_state_machine();
+#ifndef UART_TX_INTERRUPT
+        UART_TX_BK_TASK();
+#endif
+            PIN_CHECK = 1 - PIN_CHECK;
     }
 }
