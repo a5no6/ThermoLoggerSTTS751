@@ -795,8 +795,10 @@ void read_out(void)
           while(I2C_BUSY == I2C_Close());
           is_first = true;
           for(i=0;i<64;i++){
-              if(zeros[i]==0)
-                  continue;
+              if(ad+i>16 && zeros[i]==0){
+                  ad = 0x20000;
+                  break;
+              }
               if(is_first){
                   is_first = false;
                   UART_put_HEX32(ad);
@@ -811,7 +813,7 @@ void read_out(void)
 }
 
 //#define INIT_EEPROM
-//#define READ_EEPROM
+#define READ_EEPROM
 #ifdef INIT_EEPROM
 static const unsigned char test_header[16] = {1,0,0,0,  0,0,0,0,0,0,0,0,  0,0,10,0};
 #endif
