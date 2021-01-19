@@ -315,6 +315,7 @@ bool read_log_interval(void)
     }else{
         stts_log_interval = WDT_COUNT_10MINUTES;        
     }
+    stts_log_interval = 10; /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
     return(true);
 }
 
@@ -388,6 +389,7 @@ void state_machine(info_t* s)
                 LOG_DEBUG(UART_puts("woken up with ra3.\n");UART_flush(););
                 s->is_waked_by_ra3 = false;   // clear flag. 
                 if(g_eeprom_cache.eeprom_address != g_eeprom_cache.eeprom_address_unwritten ){
+                    s->i2c_need_power = true;
                     s->return_to_state = wait_for_external_use_to_be_removed;
                     s->mainstate = eeprom_write_init;
                 }else{
@@ -538,17 +540,17 @@ void state_machine(info_t* s)
                 break;
         case eeprom_write_init:
             I2C_EEPROM_WriteDataBlock(
-                    g_eeprom_cache.eeprom_address_unwritten,
-                    &g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK],
-                    g_eeprom_cache.eeprom_address-g_eeprom_cache.eeprom_address_unwritten);
+                    g_eeprom_cache.eeprom_address_unwritten&0x1ffc0,
+                    &g_eeprom_cache.eeprom_chache[(g_eeprom_cache.eeprom_address_unwritten)&64],
+                    g_eeprom_cache.eeprom_address-(g_eeprom_cache.eeprom_address_unwritten&0x1ffc0));
             UART_puts("EEPROM write ");
-            UART_put_HEX32((g_eeprom_cache.eeprom_address-1)&0xffffffc0);
+            UART_put_HEX32(g_eeprom_cache.eeprom_address_unwritten&0xffffffc0);
             UART_puts(" ");
-             UART_put_uint8((g_eeprom_cache.eeprom_address+EEPROM_BLOCK_SIZE)&EEPROM_RING_BUF_MASK);
+             UART_put_uint8(g_eeprom_cache.eeprom_address-(g_eeprom_cache.eeprom_address_unwritten&0x1ffc0));
             UART_puts(" ");
             LOG_DEBUG(
-                for(s2=0;s2<EEPROM_BLOCK_SIZE;s2++){
-                    UART_put_uint8(g_eeprom_cache.eeprom_chache[((g_eeprom_cache.eeprom_address_unwritten)&EEPROM_RING_BUF_MASK)+s2]);
+                for(s2=0;s2<g_eeprom_cache.eeprom_address-(g_eeprom_cache.eeprom_address_unwritten&0x1ffc0);s2++){
+                    UART_put_uint8(g_eeprom_cache.eeprom_chache[((g_eeprom_cache.eeprom_address_unwritten)&64)+s2]);
                     UART_puts(" ");
                   UART_flush();
                 }
@@ -808,8 +810,8 @@ void read_out(void)
     }        
 }
 
-#define INIT_EEPROM
-#define READ_EEPROM
+//#define INIT_EEPROM
+//#define READ_EEPROM
 #ifdef INIT_EEPROM
 static const unsigned char test_header[16] = {1,0,0,0,  0,0,0,0,0,0,0,0,  0,0,10,0};
 #endif
@@ -852,6 +854,7 @@ __delay_ms(10);
                 LOG_DEBUG(UART_puts(" count ");UART_put_uint16(g_info.in_state_wake_count);UART_puts("\n");UART_flush();); 
         }
          state_machine(&g_info);
+         update_power_on_demand(&g_info);
 #ifndef UART_TX_INTERRUPT
         UART_TX_BK_TASK();
 #endif
