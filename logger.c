@@ -103,7 +103,7 @@ typedef struct {
     bool is_eeprom_initialized ;
     bool is_waked_by_ra3 ;
     bool st751_need_power;
-    bool i2c_need_power;
+    bool eeprom_need_power;
     bool external_need_power;
     bool initialize_request;
     state_t mainstate;
@@ -332,7 +332,7 @@ void state_machine(info_t* s)
             PIR1bits.TMR1IF = 0;
             TMR1 = 0; 
             s->st751_need_power = false;
-            s->i2c_need_power = false;
+            s->eeprom_need_power = false;
             s->is_eeprom_initialized = false;
             s->mainstate = wait_for_external_use_to_be_removed;
             if(PORTAbits.RA3==0){
@@ -387,7 +387,7 @@ void state_machine(info_t* s)
                 LOG_DEBUG(UART_puts("woken up with ra3.\n");UART_flush(););
                 s->is_waked_by_ra3 = false;   // clear flag. 
                 if(g_eeprom_cache.eeprom_address != g_eeprom_cache.eeprom_address_unwritten ){
-                    s->i2c_need_power = true;
+                    s->eeprom_need_power = true;
                     s->return_to_state = wait_for_external_use_to_be_removed;
                     s->mainstate = eeprom_write_init;
                 }else{
@@ -525,14 +525,14 @@ void state_machine(info_t* s)
                 *((unsigned char *)(g_eeprom_cache.eeprom_chache +  (g_eeprom_cache.eeprom_address&EEPROM_RING_BUF_MASK)))  = temperature;
                 g_eeprom_cache.eeprom_address ++;
                 if(g_eeprom_cache.eeprom_address%EEPROM_BLOCK_SIZE == 0 ){
-                        s->i2c_need_power = true;
+                        s->eeprom_need_power = true;
                         s->mainstate = eeprom_write_init;
                         s->return_to_state = sleep;
                 }   else{
                     UART_flush();
                         switch_clock_to(LF31kHz);
 //                        switch_clock_to(HF1MHz);
-                        s->i2c_need_power = false;
+                        s->eeprom_need_power = false;
                         s->mainstate = sleep;                    
                 }
                 break;
@@ -562,7 +562,7 @@ void state_machine(info_t* s)
             if(i2c_is_nack){
                 g_eeprom_cache.eeprom_address_unwritten += EEPROM_BLOCK_SIZE;
                  switch_clock_to(LF31kHz);
-                 s->i2c_need_power = false;
+                 s->eeprom_need_power = false;
                  s->mainstate = sleep;
                 s->mainstate = s->return_to_state;
              }else{
@@ -576,12 +576,12 @@ void state_machine(info_t* s)
         case prepare_for_external:
                 switch_clock_to(LF31kHz);
                 s->mainstate = wait_for_external_use_to_be_removed;
-                s->i2c_need_power = false;
+                s->eeprom_need_power = false;
                 disable_i2c();
             break;
         case abnormal:
             s->st751_need_power = 0;
-            s->i2c_need_power = false;
+            s->eeprom_need_power = false;
             WDTCONbits.WDTPS = WDTPS_VALUE_SLEEP;  //2s
             s->mainstate = halt;
             switch_clock_to(LF31kHz);
@@ -656,7 +656,7 @@ void init_power_on_demand(void)
 
 void update_power_on_demand(info_t* s)
 {
-    if(s->st751_need_power || s->i2c_need_power || s->external_need_power){
+    if(s->st751_need_power || s->eeprom_need_power || s->external_need_power){
         supply_power_on_demand(1);
     }else
         supply_power_on_demand(0);
@@ -675,7 +675,7 @@ void connect_external_state_machine(info_t* s)
                 T1CONbits.TMR1ON = 0;
                 switch_clock_to(HF1MHz);
                s->mainstate = prepare_for_external;
-               s->i2c_need_power = true;
+               s->eeprom_need_power = true;
                 flush_buffered_eeprom();
                 break;
         }
