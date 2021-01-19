@@ -367,11 +367,9 @@ void state_machine(info_t* s)
                             break;                        
                         } 
                     }
-                    update_power_on_demand(&g_info);
                 }
                 switch_clock_to(LF31kHz);
                 s->mainstate = sleep ;
-                enable_i2c();
             }else{
                 LOG_DEBUG(UART_puts("going sleep.\n");UART_flush(););
                 sleep_after_uart_send();
@@ -404,7 +402,6 @@ void state_machine(info_t* s)
                 if(s->wdt_wake_count>=stts_log_interval){
                     s->wdt_wake_count -= stts_log_interval;
                     g_info.st751_need_power = true;
-                    update_power_on_demand(&g_info);
                     T1CONbits.TMR1ON = 1;
                     s->mainstate = wait_10ms;
                 }
@@ -422,6 +419,7 @@ void state_machine(info_t* s)
             break;
 
         case read_st751_status_init:
+            enable_i2c();
            returnValue = 0x00;
            reg = STTS751_REGISTER_ADDRESS_STATUS;
            i2c_is_nack = true;
@@ -629,7 +627,6 @@ void  IOC_InterruptHandler(void)
             g_info.initialize_request = true;
             g_info.external_need_power = false;            
         }
-        update_power_on_demand(&g_info);
         INTCONbits.IOCIF = 0;
         IOCAF = 0;
     }
